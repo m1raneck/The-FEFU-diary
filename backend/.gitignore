@@ -1,0 +1,34 @@
+# Системный мусор и кэш Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.cache
+.pytest_cache/
+
+# Виртуальные окружения, для каждого будут свои
+venv/
+.venv/
+env/
+bin/
+lib/
+include/
+
+# Секреты и ключи, например пароли от БД
+.env
+.flaskenv
+
+# Базы данных
+*.sqlite3
+db.sqlite3-journal
+
+# Настройки редакторов кода, у каждого свои - не учитываем
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Логи и отчеты
+*.log
+htmlcov/
+.coverage
