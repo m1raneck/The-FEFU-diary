@@ -1,8 +1,31 @@
 version: '3.8'
+
 services:
-  backend:
-    build: ./services
+  # База данных
+  db:
+    image: postgres:15
+    container_name: university_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: university
+    volumes:
+      # таблицы создаются сами при старте
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+
+  # Проверяем только один сервис
+  schedule-service:
+    build: 
+      context: ./services/schedule-service
+      dockerfile: Dockerfile
+    container_name: schedule_subsystem
+    depends_on:
+      - db
+    env_file:
+      - ./services/schedule-service/.env.example
     ports:
       - "8000:8000"
     volumes:
-      - ./services:/app
+      - ./services/schedule-service:/app
