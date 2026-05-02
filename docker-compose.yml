@@ -8,7 +8,59 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: university
     volumes:
-      # таблицы создаются сами при старте
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "5432:5432"
+    restart: always
+
+  # Аутентификация
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: auth_subsystem
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./services/auth-service/.env
+    depends_on:
+      - db
+
+  # Посещаемость
+  attendance-service:
+    build:
+      context: ./services/attendance-service
+      dockerfile: Dockerfile
+    container_name: attendance_subsystem
+    ports:
+      - "8001:8000"
+    env_file:
+      - ./services/attendance-service/.env
+    depends_on:
+      - db
+
+  # Оценочки
+  grades-service:
+    build:
+      context: ./services/grades-service
+      dockerfile: Dockerfile
+    container_name: grades_subsystem
+    ports:
+      - "8002:8000"
+    env_file:
+      - ./services/grades-service/.env
+    depends_on:
+      - db
+
+  # Расписание
+  schedule-service:
+    build:
+      context: ./services/schedule-service
+      dockerfile: Dockerfile
+    container_name: schedule_subsystem
+    ports:
+      - "8003:8000"
+    env_file:
+      - ./services/schedule-service/.env
+    depends_on:
+      - db
