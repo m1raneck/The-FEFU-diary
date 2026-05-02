@@ -16,14 +16,14 @@ CREATE TABLE IF NOT EXISTS groups (
 CREATE TABLE IF NOT EXISTS rooms (
     id SERIAL PRIMARY KEY,
     number VARCHAR(20) NOT NULL UNIQUE,
-    building VARCHAR(100),
+    building VARCHAR(100)
 );
 
 CREATE TABLE IF NOT EXISTS subjects (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL UNIQUE,
     short_name VARCHAR(50),
-    description TEXT,
+    description TEXT
 );
 
 
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     full_name VARCHAR(255) NOT NULL,
-    phone VARCHAR(20),
+    phone VARCHAR(20)
 );
 
 CREATE TABLE IF NOT EXISTS user_roles (

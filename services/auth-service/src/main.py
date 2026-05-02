@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 import os
-from sqlalchemy import create_api_engine, text
+from sqlalchemy import create_engine, text
 
 app = FastAPI()
 
@@ -14,7 +14,7 @@ def read_root():
 @app.get("/test-db")
 def test_db():
     try:
-        engine = create_api_engine(DATABASE_URL)
+        engine = create_engine(DATABASE_URL)
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
         return {"status": "Database connection successful!"}
