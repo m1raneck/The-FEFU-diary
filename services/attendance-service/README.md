@@ -13,6 +13,6 @@
    ```sh
    docker up --build db
    cd attendance-service
-   uvicorn src.<name>.py --reload
+   uvicorn src.<name>:app --reload
    ```
 4. Фреймворк: FastAPI

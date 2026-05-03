@@ -14,6 +14,6 @@
    ```sh
    docker compose up --build db
    cd schedule-service
-   uvicorn src.<name>.py --reload
+   uvicorn src.<name>:app --reload
    ```
 **Фреймворк:** FastAPI
