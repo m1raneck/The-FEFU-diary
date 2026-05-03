@@ -17,4 +17,3 @@
    uvicorn src.<name>:app --reload
    ```
 **Фреймворк:** FastAPI
-
