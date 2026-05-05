@@ -15,7 +15,7 @@ ALGORITHM = "HS256"
 
 security = HTTPBearer()
 
-def get_current_user(auth: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(database.get_db)):
+def get_current_user(auth: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(database.get_db())):
     token = auth.credentials
     
     credentials_exception = HTTPException(
@@ -49,7 +49,7 @@ def create_access_token(data: dict):
 
 
 @app.post("/api/auth/register", response_model=schemas.StandardResponse, status_code=status.HTTP_201_CREATED)
-def register(user_data: schemas.UserCreate, db: Session = Depends(database.get_db)):
+def register(user_data: schemas.UserCreate, db: Session = Depends(database.get_db())):
     db_user = db.query(models.User).filter(models.User.email == user_data.email).first()
     if db_user:
         return {"status": "error", "message": "Email already registered"}
@@ -94,7 +94,7 @@ def register(user_data: schemas.UserCreate, db: Session = Depends(database.get_d
         return {"status": "error", "message": f"Database error: {str(e)}"}
 
 @app.post("/api/auth/login", response_model=schemas.StandardResponse)
-def login(credentials: schemas.UserLogin, db: Session = Depends(database.get_db)):
+def login(credentials: schemas.UserLogin, db: Session = Depends(database.get_db())):
     user = db.query(models.User).filter(models.User.email == credentials.login).first()
     
     if not user or not verify_password(credentials.password, user.password_hash):
@@ -104,7 +104,7 @@ def login(credentials: schemas.UserLogin, db: Session = Depends(database.get_db)
     return {"status": "success", "data": {"token": token}, "message": "Login successful"}
 
 @app.get("/api/users/me", response_model=schemas.StandardResponse)
-def read_users_me(current_user: models.User = Depends(get_current_user)):
+def read_users_me(current_user: models.User = Depends(get_current_user())):
     profile_data = {
         "id": current_user.id,
         "email": current_user.email,
