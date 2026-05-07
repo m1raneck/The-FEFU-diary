@@ -8,7 +8,8 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: university_db
     volumes:
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./database/01_init.sql:/docker-entrypoint-initdb.d/01_init.sql
+      - ./database/02_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
     ports:
       - "5432:5432"
     restart: always
