@@ -1,4 +1,3 @@
-
 CREATE TABLE IF NOT EXISTS roles (
     id SERIAL PRIMARY KEY,
     name VARCHAR(50) NOT NULL UNIQUE,
@@ -16,17 +15,17 @@ CREATE TABLE IF NOT EXISTS groups (
 CREATE TABLE IF NOT EXISTS rooms (
     id SERIAL PRIMARY KEY,
     number VARCHAR(20) NOT NULL UNIQUE,
-    building VARCHAR(100)
+    building VARCHAR(100),
+    capacity INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS subjects (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL UNIQUE,
     short_name VARCHAR(50),
-    description TEXT
+    description TEXT,
+    credits INTEGER -- <--- ДОБАВЛЕНО ПОЛЕ (было причиной ошибки)
 );
-
-
 
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
@@ -102,8 +101,6 @@ CREATE TABLE IF NOT EXISTS attendance (
     UNIQUE(student_id, schedule_id, date)
 );
 
-
-
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_full_name ON users(full_name);
 CREATE INDEX IF NOT EXISTS idx_students_group_id ON students(group_id);
@@ -117,5 +114,3 @@ CREATE INDEX IF NOT EXISTS idx_grades_schedule_id ON grades(schedule_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_student_id ON attendance(student_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_schedule_id ON attendance(schedule_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(date);
-
-

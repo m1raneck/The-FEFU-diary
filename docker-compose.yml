@@ -8,7 +8,8 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: university_db
     volumes:
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./database/01_init.sql:/docker-entrypoint-initdb.d/01_init.sql
+      - ./database/02_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
     ports:
       - "5432:5432"
     restart: always
@@ -27,40 +28,40 @@ services:
       - postgres
 
   # Посещаемость
-  # attendance-service:
-  #   build:
-  #     context: ./services/attendance-service
-  #     dockerfile: Dockerfile
-  #   container_name: attendance_subsystem
-  #   ports:
-  #     - "8001:8000"
-  #   env_file:
-  #     - ./services/attendance-service/.env.example
-  #   depends_on:
-  #     - postgres
+  attendance-service:
+    build:
+      context: ./services/attendance-service
+      dockerfile: Dockerfile
+    container_name: attendance_subsystem
+    ports:
+      - "8001:8000"
+    env_file:
+      - ./services/attendance-service/.env.example
+    depends_on:
+      - postgres
 
   # Оценочки
-  # grades-service:
-  #   build:
-  #     context: ./services/grades-service
-  #     dockerfile: Dockerfile
-  #   container_name: grades_subsystem
-  #   ports:
-  #     - "8002:8000"
-  #   env_file:
-  #     - ./services/grades-service/.env.example
-  #   depends_on:
-  #     - postgres
+  grades-service:
+    build:
+      context: ./services/grades-service
+      dockerfile: Dockerfile
+    container_name: grades_subsystem
+    ports:
+      - "8002:8000"
+    env_file:
+      - ./services/grades-service/.env.example
+    depends_on:
+      - postgres
 
   # Расписание
-  # schedule-service:
-  #   build:
-  #     context: ./services/schedule-service
-  #     dockerfile: Dockerfile
-  #   container_name: schedule_subsystem
-  #   ports:
-  #     - "8003:8000"
-  #   env_file:
-  #     - ./services/schedule-service/.env.example
-  #   depends_on:
-  #     - postgres
+  schedule-service:
+    build:
+      context: ./services/schedule-service
+      dockerfile: Dockerfile
+    container_name: schedule_subsystem
+    ports:
+      - "8003:8000"
+    env_file:
+      - ./services/schedule-service/.env.example
+    depends_on:
+      - postgres
