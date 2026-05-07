@@ -1,3 +1,5 @@
+from datetime import date
+from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
@@ -8,7 +10,7 @@ app = FastAPI (title="Attendance Service")
 security = HTTPBearer()
 SECRET_KEY = "super-secret-key-for-fefu-diary"
 
-def get_current_user(auth: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(database.get_db())):
+def get_current_user(auth: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(database.get_db)):
     token = auth.credentials
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
@@ -22,13 +24,13 @@ def get_current_user(auth: HTTPAuthorizationCredentials = Depends(security), db:
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-def get_teacher_role(current_user = Depends(get_current_user()), db: Session = Depends(database.get_db())):
+def get_teacher_role(current_user = Depends(get_current_user), db: Session = Depends(database.get_db)):
     result = db.execute("SELECT 1 FROM user_roles ur JOIN roles r ON ur.role_id = r.id WHERE ur.user_id = :uid AND r.name = 'teacher'", {"uid": current_user.id}).fetchone()
     if not result:
         raise HTTPException(status_code=403, detail="Teacher access required")
     return current_user
 
-def get_student_role(current_user = Depends(get_current_user()), db: Session = Depends(database.get_db())):
+def get_student_role(current_user = Depends(get_current_user), db: Session = Depends(database.get_db)):
     result = db.execute("SELECT 1 FROM user_roles ur JOIN roles r ON ur.role_id = r.id WHERE ur.user_id = :uid AND r.name = 'student'", {"uid": current_user.id}).fetchone()
     if not result:
         raise HTTPException(status_code=403, detail="Student access required")
@@ -61,7 +63,7 @@ def get_attendance(
 
 
 @app.post("/api/attendance", response_model=schemas.AttendanceResponse, status_code=status.HTTP_201_CREATED)
-def create_attendance(att: schemas.AttendanceCreate, db: Session = Depends(database.get_db()), _ = Depends(get_teacher_role())):
+def create_attendance(att: schemas.AttendanceCreate, db: Session = Depends(database.get_db), _ = Depends(get_teacher_role)):
     new_att = models.Attendance(**att.dict())
     db.add(new_att)
     db.commit()
@@ -70,7 +72,7 @@ def create_attendance(att: schemas.AttendanceCreate, db: Session = Depends(datab
 
 
 @app.put("/api/attendance/{attendance_id}", response_model=schemas.AttendanceResponse)
-def update_attendance(attendance_id: int, att: schemas.AttendanceCreate, db: Session = Depends(database.get_db()), _ = Depends(get_teacher_role())):
+def update_attendance(attendance_id: int, att: schemas.AttendanceCreate, db: Session = Depends(database.get_db), _ = Depends(get_teacher_role)):
     db_att = db.query(models.Attendance).filter(models.Attendance.id == attendance_id).first()
     if not db_att:
         raise HTTPException(status_code=404, detail="Attendance record not found")
@@ -82,7 +84,7 @@ def update_attendance(attendance_id: int, att: schemas.AttendanceCreate, db: Ses
 
 
 @app.delete("/api/attendance/{attendance_id}")
-def delete_attendance(attendance_id: int, db: Session = Depends(database.get_db()), _ = Depends(get_teacher_role())):
+def delete_attendance(attendance_id: int, db: Session = Depends(database.get_db), _ = Depends(get_teacher_role)):
     db_att = db.query(models.Attendance).filter(models.Attendance.id == attendance_id).first()
     if not db_att:
         raise HTTPException(status_code=404, detail="Attendance record not found")

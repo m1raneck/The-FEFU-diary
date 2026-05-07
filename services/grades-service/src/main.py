@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, status
+from typing import Optional
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from jose import jwt, JWTError
@@ -11,7 +12,7 @@ app = FastAPI (title="Grades Service")
 security = HTTPBearer()
 SECRET_KEY = "super-secret-key-for-fefu-diary"  
 
-def get_current_user(auth: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(database.get_db())):
+def get_current_user(auth: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(database.get_db)):
     token = auth.credentials
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
@@ -60,7 +61,7 @@ def get_grades(
 
 
 @app.post("/api/grades", response_model=schemas.GradeResponse, status_code=status.HTTP_201_CREATED)
-def create_grade(grade: schemas.GradeCreate, db: Session = Depends(database.get_db()), _ = Depends(get_teacher_role())):
+def create_grade(grade: schemas.GradeCreate, db: Session = Depends(database.get_db), _ = Depends(get_teacher_role)):
     new_grade = models.Grade(**grade.dict())
     db.add(new_grade)
     db.commit()
@@ -69,7 +70,7 @@ def create_grade(grade: schemas.GradeCreate, db: Session = Depends(database.get_
 
 
 @app.put("/api/grades/{grade_id}", response_model=schemas.GradeResponse)
-def update_grade(grade_id: int, grade: schemas.GradeCreate, db: Session = Depends(database.get_db), _ = Depends(get_teacher_role())):
+def update_grade(grade_id: int, grade: schemas.GradeCreate, db: Session = Depends(database.get_db), _ = Depends(get_teacher_role)):
     db_grade = db.query(models.Grade).filter(models.Grade.id == grade_id).first()
     if not db_grade:
         raise HTTPException(status_code=404, detail="Grade not found")
@@ -81,7 +82,7 @@ def update_grade(grade_id: int, grade: schemas.GradeCreate, db: Session = Depend
 
 
 @app.delete("/api/grades/{grade_id}")
-def delete_grade(grade_id: int, db: Session = Depends(database.get_db()), _ = Depends(get_teacher_role())):
+def delete_grade(grade_id: int, db: Session = Depends(database.get_db), _ = Depends(get_teacher_role)):
     db_grade = db.query(models.Grade).filter(models.Grade.id == grade_id).first()
     if not db_grade:
         raise HTTPException(status_code=404, detail="Grade not found")
