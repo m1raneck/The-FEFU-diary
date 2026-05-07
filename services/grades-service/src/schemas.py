@@ -50,8 +50,8 @@ class ScheduleBase(BaseModel):
     subject_id: int
     teacher_id: int
     room_id: Optional[int] = None
-    weekday: int   # 1-7
-    lesson_number: int  # 1-8
+    weekday: int 
+    lesson_number: int 
     semester: int
     year: int
 
