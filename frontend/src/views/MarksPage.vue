@@ -1,0 +1,811 @@
+<template>
+  <div class="marks-wrapper">
+    <div class="marks-header">
+      <div class="group-name">Группа: <b>Б9124-09.03.03ру</b></div>
+      <div class="subject-pill">{{ subjectName }}</div>
+      <button class="close-btn" @click="$emit('close')">✕</button>
+    </div>
+
+    <div class="import-panel">
+      <div class="import-controls">
+        <label class="import-file-btn">
+          Загрузить CSV
+          <input type="file" accept=".csv" @change="handleFileUpload" style="display: none" ref="fileInput" />
+        </label>
+        <button class="sample-btn" @click="downloadSampleCSV">Пример CSV</button>
+        <button v-if="!importModeActive" class="switch-mode-btn" @click="activateImportMode">➕ Импорт нескольких тестов</button>
+        <button v-else class="switch-mode-btn" @click="cancelMultiImport">✕ Отменить импорт</button>
+        <button v-if="importModeActive" class="scale-settings-btn" @click.stop="openScalePopup">⚙ Настроить шкалу</button>
+      </div>
+
+  
+      <div v-if="importModeActive" class="multi-import-container">
+        <div class="mapping-table">
+          <div class="mapping-row header">
+            <div>CSV колонка</div>
+            <div>Целевая дата</div>
+            <div>Перевести в оценку (2‑5)</div>
+          </div>
+          <div v-for="(col, idx) in csvScoreColumns" :key="idx" class="mapping-row">
+            <div><strong>{{ col.header }}</strong> ({{ col.sampleValues.join(', ') }}%)</div>
+            <div>
+              <select v-model="col.targetDateIdx">
+                <option v-for="(date, dIdx) in dates" :value="dIdx">{{ date }}</option>
+              </select>
+            </div>
+            <div>
+              <input type="checkbox" v-model="col.useGradeScale" />
+              <span class="hint">(по вашей шкале)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="import-actions">
+          <button @click="applyMultiImport" :disabled="!hasEnabledMappings" class="apply-import-btn">📥 Выставить оценки</button>
+          <button @click="cancelMultiImport" class="cancel-import-btn">Отмена</button>
+        </div>
+
+        <div v-if="multiPreview.length" class="import-preview">
+          <div class="preview-header">
+            <span>Предпросмотр (первые 5 студентов)</span>
+          </div>
+          <div class="preview-list">
+            <div v-for="preview in multiPreview.slice(0,5)" :key="preview.studentName" class="preview-item">
+              <span class="preview-name">{{ preview.studentName }}</span>
+              <span v-for="map in preview.mappings" :key="map.csvHeader" class="preview-mapping">
+                {{ map.csvHeader }} → {{ map.finalGrade }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+   
+      <div v-if="importMessage" class="import-message" :class="importMessageType">{{ importMessage }}</div>
+    </div>
+
+
+    <div class="table-scroll">
+      <table class="marks-table">
+        <thead>
+          <tr>
+            <th class="col-num">№</th>
+            <th class="col-name">ФИО</th>
+            <th class="col-stat">Ср.</th>
+            <th class="col-stat">П.</th>
+            <th v-for="(date, dIdx) in dates" :key="date" class="date-col">
+              <div class="date-text">{{ date }}</div>
+              <div class="col-type-row">
+                <span class="type-selector" @click.stop="openTypePopup($event, dIdx)">
+                  {{ columnSettings[dIdx].type || 'Оц.' }}
+                </span>
+              </div>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(student, sIdx) in students" :key="sIdx" class="student-row">
+            <td class="col-num">{{ sIdx+1 }}</td>
+            <td class="col-name">{{ student.name }}</td>
+            <td class="col-stat">
+              <span class="avg-badge" :class="getAvgClass(student.avg)">{{ student.avg }}</span>
+            </td>
+            <td class="col-stat" :class="{ 'warn-att': student.attendance < 60 }">{{ student.attendance }}%</td>
+            <td v-for="(rec, dIdx) in student.records" :key="dIdx" class="combo-cell">
+              <div class="combo-inner">
+                <div class="combo-grade" @click.stop="editGrade(sIdx, dIdx)">
+                  <span class="grade-val" :class="getGradeClass(rec.grade, dIdx)">
+                    {{ rec.grade === '' ? '—' : rec.grade }}
+                  </span>
+                </div>
+                <div class="combo-presence" 
+                     :class="rec.present ? 'pres-yes' : 'pres-no'"
+                     @click.stop="togglePresence(sIdx, dIdx)"
+                     :title="rec.present ? 'Отметить отсутствие' : 'Отметить присутствие'">
+                  {{ rec.present ? '✓' : '✗' }}
+                </div>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    
+    <div class="legend-row">
+      <span class="legend-item"><span class="leg-dot pres-dot"></span>Присутствовал</span>
+      <span class="legend-item"><span class="leg-dot abs-dot"></span>Отсутствовал</span>
+      <span class="legend-sep">|</span>
+      <span class="legend-item">Левая часть — оценка, правая — посещение</span>
+    </div>
+
+    <Teleport to="body">
+      <Transition name="popup-fade">
+        <div v-if="popup.visible" class="type-popup" :style="{ top: popup.y+'px', left: popup.x+'px' }">
+          <div class="popup-label">Тип колонки</div>
+          <div class="popup-grid">
+            <button class="popup-btn kr"   @click="setType('КР', 5)">КР</button>
+            <button class="popup-btn dop"  @click="setType('ДОП', null)">ДОП</button>
+            <button class="popup-btn dz"   @click="setType('ДЗ', 100)">ДЗ</button>
+            <button class="popup-btn dash" @click="setType('±', 0)">±</button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+
+    <Teleport to="body">
+      <Transition name="popup-fade">
+        <div v-if="scalePopup.visible" class="type-popup scale-popup" :style="{ top: scalePopup.y+'px', left: scalePopup.x+'px' }" @click.stop>
+          <div class="popup-label">Настройка шкалы</div>
+          <div class="scale-inputs">
+            <div class="scale-row">
+              <span class="grade-label">Оценка 2:</span>
+              от <input type="number" v-model.number="gradeScale.from2" step="1" class="scale-input" />
+              до <input type="number" v-model.number="gradeScale.to2" step="1" class="scale-input" />
+            </div>
+            <div class="scale-row">
+              <span class="grade-label">Оценка 3:</span>
+              от <input type="number" v-model.number="gradeScale.from3" step="1" class="scale-input" />
+              до <input type="number" v-model.number="gradeScale.to3" step="1" class="scale-input" />
+            </div>
+            <div class="scale-row">
+              <span class="grade-label">Оценка 4:</span>
+              от <input type="number" v-model.number="gradeScale.from4" step="1" class="scale-input" />
+              до <input type="number" v-model.number="gradeScale.to4" step="1" class="scale-input" />
+            </div>
+            <div class="scale-row">
+              <span class="grade-label">Оценка 5:</span>
+              от <input type="number" v-model.number="gradeScale.from5" step="1" class="scale-input" />
+              до <input type="number" v-model.number="gradeScale.to5" step="1" class="scale-input" />
+            </div>
+          </div>
+          <div class="scale-actions">
+            <button class="popup-btn large-btn" @click="closeScalePopup">Применить</button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    
+    <Teleport to="body">
+      <Transition name="fade-scale">
+        <div v-if="gradeInput.visible" class="grade-overlay" @click.self="gradeInput.visible = false">
+          <div class="grade-popup">
+            <div class="grade-popup-name">{{ gradeInput.studentName }}</div>
+            <div class="grade-popup-sub">{{ gradeInput.typeName }} · максимум {{ gradeInput.max }}</div>
+            <input ref="gradeInputRef" v-model="gradeInput.value" class="grade-field"
+                   type="number" :min="0" :max="gradeInput.max" :placeholder="`0–${gradeInput.max}`"
+                   @keyup.enter="confirmGrade" @keyup.esc="gradeInput.visible=false" />
+            <div class="grade-actions">
+              <button class="btn-cancel" @click="gradeInput.visible=false">Отмена</button>
+              <button class="btn-ok" @click="confirmGrade">Сохранить</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+  </div>
+</template>
+
+<script setup>
+import { ref, nextTick, onMounted, onBeforeUnmount, computed, watch } from 'vue';
+
+const props = defineProps({ subjectName: { type: String, default: 'Базы данных' } });
+const emit = defineEmits(['close']);
+
+
+const dates = ['21/04', '28/04', '5/05', '12/05', '19/05'];
+const columnSettings = ref(dates.map(() => ({ type: null, max: 5 })));
+
+const students = ref([
+  { name: 'Беляев А.А.',     avg: 65, attendance: 100, records: dates.map(() => ({ grade: '', present: true })) },
+  { name: 'Васильев А.Г.',   avg: 30, attendance: 98,  records: dates.map(() => ({ grade: '', present: true })) },
+  { name: 'Геннадьева В.Д.', avg: 63, attendance: 50,  records: dates.map(() => ({ grade: '', present: false })) },
+  { name: 'Кирова Л.Д.',     avg: 58, attendance: 77,  records: dates.map(() => ({ grade: '', present: true })) },
+  { name: 'Макарова Н.В.',   avg: 52, attendance: 98,  records: dates.map(() => ({ grade: '', present: true })) },
+  { name: 'Лаврова Л.Д.',    avg: 70, attendance: 77,  records: dates.map(() => ({ grade: '', present: true })) },
+  { name: 'Никитина В.Н.',   avg: 21, attendance: 100, records: dates.map(() => ({ grade: '', present: true })) },
+  { name: 'Орлова А.А.',     avg: 0,  attendance: 0,   records: dates.map(() => ({ grade: '', present: false })) },
+  { name: 'Павлова В.Н.',    avg: 36, attendance: 50,  records: dates.map(() => ({ grade: '', present: true })) },
+]);
+
+
+const gradeScale = ref({
+  from2: 0, to2: 40,
+  from3: 41, to3: 60,
+  from4: 61, to4: 80,
+  from5: 81, to5: 100
+});
+
+
+function convertPercentToGrade(percent) {
+  if (percent >= gradeScale.value.from2 && percent <= gradeScale.value.to2) return 2;
+  if (percent >= gradeScale.value.from3 && percent <= gradeScale.value.to3) return 3;
+  if (percent >= gradeScale.value.from4 && percent <= gradeScale.value.to4) return 4;
+  if (percent >= gradeScale.value.from5 && percent <= gradeScale.value.to5) return 5;
+  return null;
+}
+
+
+function recalcStudentStats() {
+  students.value.forEach(student => {
+    let totalPercent = 0, graded = 0, presentCount = 0;
+    student.records.forEach((rec, idx) => {
+      const cfg = columnSettings.value[idx];
+      if (cfg && cfg.max && rec.grade !== '' && rec.grade !== '+' && rec.grade !== '-') {
+        const g = parseFloat(rec.grade);
+        if (!isNaN(g)) { 
+          totalPercent += (g / cfg.max) * 100; 
+          graded++; 
+        }
+      }
+      if (rec.present) presentCount++;
+    });
+    student.avg = graded ? Math.round(totalPercent / graded) : 0;
+    student.attendance = Math.round((presentCount / dates.length) * 100);
+  });
+}
+
+
+function parseCSV(text) {
+  const rows = [], regex = /(?:,|^)(?:"([^"]*(?:""[^"]*)*)"|([^",]*))/g;
+  const lines = text.split(/\r?\n/);
+  for (let line of lines) {
+    if (!line.trim()) continue;
+    const row = []; let match;
+    while ((match = regex.exec(line)) !== null) row.push(match[1] !== undefined ? match[1].replace(/""/g, '"') : (match[2] || ''));
+    if (row.length) rows.push(row);
+    regex.lastIndex = 0;
+  }
+  return rows;
+}
+
+
+const importModeActive = ref(false);
+const csvScoreColumns = ref([]);
+const rawCsvRows = ref([]);
+const headers = ref([]);
+const multiPreview = ref([]);
+const importMessage = ref('');
+const importMessageType = ref('info');
+const fileInput = ref(null);
+
+const hasEnabledMappings = computed(() => csvScoreColumns.value.some(c => c.targetDateIdx !== undefined));
+
+function activateImportMode() {
+  importModeActive.value = true;
+  if (csvScoreColumns.value.length === 0) {
+    setImportMsg('Загрузите CSV-файл с процентами', 'info');
+  }
+}
+
+function cancelMultiImport() {
+  importModeActive.value = false;
+  csvScoreColumns.value = [];
+  rawCsvRows.value = [];
+  headers.value = [];
+  multiPreview.value = [];
+  setImportMsg('', 'info');
+}
+
+function handleFileUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const rows = parseCSV(e.target.result);
+      if (rows.length < 2) throw new Error('Файл должен содержать заголовки и данные');
+      analyzeCSVForMultiImport(rows);
+    } catch (err) {
+      setImportMsg(err.message, 'error');
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+  event.target.value = '';
+}
+
+function analyzeCSVForMultiImport(rows) {
+  headers.value = rows[0].map(h => h.trim());
+  const dataRows = rows.slice(1);
+  if (dataRows.length === 0) throw new Error('Нет строк с данными');
+
+  let nameColIdx = headers.value.findIndex(h => /студент|фио|student|name/i.test(h));
+  if (nameColIdx === -1) nameColIdx = 0;
+
+  const scoreCols = [];
+  for (let i = 0; i < headers.value.length; i++) {
+    if (i === nameColIdx) continue;
+    const values = dataRows.map(row => parseFloat(row[i])).filter(v => !isNaN(v));
+    if (values.length === 0) continue;
+    const sampleValues = [...new Set(values.slice(0, 3))];
+    const studentScores = dataRows.map(row => {
+      const val = parseFloat(row[i]);
+      return isNaN(val) ? 0 : val;
+    });
+    const rawNames = dataRows.map(row => row[nameColIdx]?.trim() || '');
+    scoreCols.push({
+      header: headers.value[i],
+      sampleValues,
+      targetDateIdx: 0,
+      useGradeScale: false,
+      studentScores,
+      rawNames
+    });
+  }
+  if (scoreCols.length === 0) throw new Error('Не найдено числовых колонок с процентами');
+  csvScoreColumns.value = scoreCols;
+  rawCsvRows.value = dataRows;
+  importModeActive.value = true;
+  computeMultiPreview();
+  setImportMsg(`Обнаружено ${scoreCols.length} колонок. Настройте импорт.`, 'success');
+}
+
+function computeMultiPreview() {
+  const preview = [];
+  for (const student of students.value) {
+    const studentName = student.name;
+    const mappings = [];
+    for (const col of csvScoreColumns.value) {
+      const rowIdx = col.rawNames.findIndex(n => n.toLowerCase() === studentName.toLowerCase());
+      if (rowIdx === -1) continue;
+      let percent = col.studentScores[rowIdx];
+      let finalGrade;
+      if (col.useGradeScale) {
+        const grade = convertPercentToGrade(percent);
+        finalGrade = grade !== null ? grade : percent;
+      } else {
+        finalGrade = percent;
+      }
+      mappings.push({
+        csvHeader: col.header,
+        finalGrade,
+        targetDateIdx: col.targetDateIdx
+      });
+    }
+    if (mappings.length) preview.push({ studentName, mappings });
+  }
+  multiPreview.value = preview;
+}
+
+function applyMultiImport() {
+  let appliedCount = 0;
+  for (const col of csvScoreColumns.value) {
+    const targetColIdx = col.targetDateIdx;
+    if (col.useGradeScale) {
+      columnSettings.value[targetColIdx] = { type: 'Оценка', max: 5 };
+    } else if (!columnSettings.value[targetColIdx]?.type) {
+      // Для сырых процентов создаём тест с максимумом 100
+      columnSettings.value[targetColIdx] = { type: 'Тест', max: 100 };
+    }
+    const finalTargetMax = columnSettings.value[targetColIdx].max;
+
+    for (let rowIdx = 0; rowIdx < rawCsvRows.value.length; rowIdx++) {
+      const studentNameRaw = col.rawNames[rowIdx];
+      const student = students.value.find(s => s.name.toLowerCase() === studentNameRaw?.toLowerCase());
+      if (!student) continue;
+      let percent = col.studentScores[rowIdx];
+      let finalGrade;
+      if (col.useGradeScale) {
+        const grade = convertPercentToGrade(percent);
+        finalGrade = grade !== null ? grade : percent;
+      } else {
+        finalGrade = Math.min(percent, finalTargetMax);
+      }
+      student.records[targetColIdx].grade = finalGrade;
+    }
+    appliedCount++;
+  }
+  recalcStudentStats();
+  setImportMsg(`✅ Импорт завершён: обработано ${appliedCount} колонок`, 'success');
+  cancelMultiImport();
+}
+
+function setImportMsg(msg, type) {
+  importMessage.value = msg;
+  importMessageType.value = type;
+  if (msg) setTimeout(() => { if (importMessage.value === msg) importMessage.value = ''; }, 4000);
+}
+
+watch(csvScoreColumns, () => { computeMultiPreview(); }, { deep: true });
+
+
+const scalePopup = ref({ visible: false, x: 0, y: 0 });
+function openScalePopup(event) {
+  event.stopPropagation();
+  const rect = event.target.getBoundingClientRect();
+  scalePopup.value = {
+    visible: true,
+    x: Math.min(rect.left + window.scrollX - 220, window.innerWidth - 480),
+    y: rect.bottom + window.scrollY + 8
+  };
+}
+function closeScalePopup() {
+  scalePopup.value.visible = false;
+  computeMultiPreview();
+}
+
+const popup = ref({ visible: false, x: 0, y: 0, dIndex: null });
+const gradeInput = ref({ visible: false, sIdx: null, dIdx: null, value: '', max: 5, typeName: '', studentName: '' });
+const gradeInputRef = ref(null);
+
+function getAvgClass(avg) {
+  if (avg >= 70) return 'avg-good';
+  if (avg >= 40) return 'avg-mid';
+  return 'avg-bad';
+}
+function getGradeClass(grade, dIdx) {
+  if (grade === '' || grade === '+' || grade === '-') return 'grade-empty';
+  const cfg = columnSettings.value[dIdx];
+  if (!cfg.max) return '';
+  const ratio = grade / cfg.max;
+  if (ratio >= 0.8) return 'g-good';
+  if (ratio <= 0.5) return 'g-low';
+  return '';
+}
+function openTypePopup(e, dIdx) {
+  const rect = e.target.getBoundingClientRect();
+  popup.value = { visible: true, x: Math.min(rect.left + window.scrollX - 80, window.innerWidth-280), y: rect.bottom + window.scrollY + 8, dIndex: dIdx };
+}
+function closePopup() { popup.value.visible = false; }
+function setType(type, max) {
+  const dIdx = popup.value.dIndex;
+  if (type === 'ДОП') { const c = prompt('Максимальный балл для ДОП:'); if (!c || isNaN(+c) || +c <= 0) { alert('Нужно положительное число'); return; } max = +c; }
+  students.value.forEach(s => { s.records[dIdx].grade = type === '±' ? '+' : '0'; });
+  columnSettings.value[dIdx] = { type, max };
+  recalcStudentStats();
+  closePopup();
+}
+async function editGrade(sIdx, dIdx) {
+  const cfg = columnSettings.value[dIdx];
+  if (!cfg.type) { alert('Сначала выберите тип колонки (кнопка "Оц." вверху)'); return; }
+  if (cfg.type === '±') {
+    const rec = students.value[sIdx].records[dIdx];
+    rec.grade = rec.grade === '+' ? '-' : '+';
+    recalcStudentStats();
+    return;
+  }
+  gradeInput.value = { visible: true, sIdx, dIdx, value: students.value[sIdx].records[dIdx].grade === '' ? '' : students.value[sIdx].records[dIdx].grade, max: cfg.max, typeName: cfg.type, studentName: students.value[sIdx].name };
+  await nextTick();
+  gradeInputRef.value?.focus(); gradeInputRef.value?.select();
+}
+function confirmGrade() {
+  const { sIdx, dIdx, value, max } = gradeInput.value;
+  const num = +value;
+  if (value === '' || isNaN(num) || num < 0 || num > max) { alert(`Введите число от 0 до ${max}`); return; }
+  students.value[sIdx].records[dIdx].grade = num;
+  gradeInput.value.visible = false;
+  recalcStudentStats();
+}
+function togglePresence(sIdx, dIdx) {
+  students.value[sIdx].records[dIdx].present = !students.value[sIdx].records[dIdx].present;
+  recalcStudentStats();
+}
+function handleClickOutside(e) {
+  if (!e.target.closest('.type-popup')) closePopup();
+  if (scalePopup.value.visible && !e.target.closest('.scale-popup')) scalePopup.value.visible = false;
+}
+onMounted(() => { document.addEventListener('click', handleClickOutside); recalcStudentStats(); });
+onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside));
+
+
+function downloadSampleCSV() {
+  const sampleRows = [
+    ['Студент', 'Тест 1 (%)', 'Тест 2 (%)'],
+    ['Беляев А.А.', '85', '64'],
+    ['Васильев А.Г.', '42', '33'],
+    ['Геннадьева В.Д.', '78', '91'],
+    ['Кирова Л.Д.', '94', '73'],
+    ['Макарова Н.В.', '55', '48'],
+    ['Лаврова Л.Д.', '97', '86'],
+    ['Никитина В.Н.', '23', '19'],
+    ['Орлова А.А.', '0', '0'],
+    ['Павлова В.Н.', '39', '31']
+  ];
+  const csv = sampleRows.map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'example_marks.csv'; a.click(); URL.revokeObjectURL(a.href);
+}
+</script>
+
+<style scoped>
+
+.marks-wrapper {
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  background: #91a6c5;
+  border-radius: 24px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  font-family: system-ui, 'Inter', -apple-system, 'Segoe UI', sans-serif;
+  overflow: hidden;
+}
+.marks-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: #5f7b9f66;
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(66, 107, 157, 0.5);
+}
+.group-name { font-size: 13px; font-weight: 500; color: #162545; background: transparent; }
+.group-name b { color: #12375d; font-weight: 600; }
+.subject-pill {
+  font-size: 15px; font-weight: 500; background: #9ab0cc; padding: 5px 20px;
+  border-radius: 40px; color: #1e4a76; border: 1px solid #cbdae9;
+}
+.close-btn {
+  width: 32px; height: 32px; border-radius: 50%; background: transparent;
+  border: 1px solid #9eaab7; color: #c4cfe0; cursor: pointer; transition: 0.15s;
+}
+.close-btn:hover { background: rgba(191, 204, 223, 0.7); color: #1e3a5f; }
+.import-panel {
+  margin: 16px 24px 0;
+  background: #c5d5ec;
+  border-radius: 20px;
+  padding: 12px 18px;
+  border: 1px solid #d0dcea;
+}
+.import-controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.import-file-btn, .sample-btn, .switch-mode-btn, .scale-settings-btn {
+  background: #dfe6ef;
+  border: 1px solid #edf1f6;
+  padding: 6px 18px;
+  border-radius: 32px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1e3a5f;
+  cursor: pointer;
+  transition: 0.1s;
+}
+.import-file-btn:hover, .sample-btn:hover, .switch-mode-btn:hover, .scale-settings-btn:hover {
+  background: #e9f0f8; border-color: #b8cae0;
+}
+.multi-import-container {
+  margin-top: 16px;
+  border-top: 1px solid #b0c4de;
+  padding-top: 12px;
+}
+.mapping-table {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.mapping-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.2fr;
+  gap: 12px;
+  align-items: center;
+  font-size: 13px;
+}
+.mapping-row.header {
+  font-weight: 600;
+  color: #1e3a5f;
+  border-bottom: 1px solid #9bb1cc;
+  padding-bottom: 6px;
+}
+.hint { font-size: 10px; color: #2c5a7a; margin-left: 4px; }
+.import-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.apply-import-btn, .cancel-import-btn {
+  background: #8eb2e2;
+  border: none;
+  padding: 6px 20px;
+  border-radius: 32px;
+  font-weight: 500;
+  color: rgb(42, 63, 105);
+  cursor: pointer;
+}
+.apply-import-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.cancel-import-btn { background: #dfe6ef; }
+.import-preview {
+  background: #eef3fc;
+  border-radius: 16px;
+  padding: 8px 12px;
+}
+.preview-header { font-weight: 600; margin-bottom: 8px; color: #1e3a5f; }
+.preview-list { display: flex; flex-direction: column; gap: 6px; }
+.preview-item { background: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; display: flex; gap: 12px; flex-wrap: wrap; }
+.preview-name { font-weight: 700; color: #1e4a76; }
+.preview-mapping { background: #e9f0f8; padding: 2px 8px; border-radius: 16px; }
+.import-message { margin-top: 10px; font-size: 12px; padding: 6px 12px; border-radius: 24px; }
+.import-message.success { background: #e0f0e8; color: #1f6e43; }
+.import-message.error { background: #fee8e8; color: #b13b3b; }
+.import-message.info { background: #e3edf8; color: #2c6e9e; }
+.table-scroll {
+  overflow: auto;
+  flex: 1;
+  margin: 20px 20px 8px;
+  border-radius: 16px;
+  border: 1px solid #5f7b9f;
+  background: #3c5b84;
+}
+.marks-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 640px;
+}
+.marks-table thead th {
+  position: sticky;
+  top: 0;
+  background: #dae4ed;
+  padding: 12px 4px;
+  font-weight: 600;
+  color: #17365f;
+  border-bottom: 1px solid #cad5e4;
+}
+.marks-table td { padding: 0; height: 44px; border-bottom: 1px solid #c9d5e4; }
+.student-row:nth-child(odd) td { background: #ced9e2; }
+.student-row:nth-child(even) td { background: #dbe5ee; }
+.student-row:hover td { background: #c0cad9 !important; }
+.col-num { width: 44px; text-align: center; color: #3b4d69; }
+.col-name { text-align: left; padding-left: 16px; font-weight: 500; color: #1a2c44; }
+.col-stat { width: 64px; text-align: center; }
+.avg-badge { display: inline-block; padding: 3px 8px; border-radius: 20px; font-weight: 600; }
+.avg-good { background: #dff0e6; color: #1f6e43; }
+.avg-mid { background: #feefcf; color: #b76e00; }
+.avg-bad { background: #ecdcdc; color: #b13b3b; }
+.warn-att { color: #b13b3b; font-weight: 600; }
+.date-col { min-width: 90px; }
+.date-text { font-size: 12px; font-weight: 600; color: #19486a; margin-bottom: 6px; }
+.type-selector {
+  cursor: pointer;
+  background: #a9bdd1;
+  padding: 2px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #2c3e66;
+  border: 1px solid #cfdfed;
+}
+.type-selector:hover { background: #e9f0f8; }
+.combo-cell { padding: 4px 8px !important; }
+.combo-inner {
+  display: flex;
+  align-items: stretch;
+  height: 36px;
+  border-radius: 12px;
+  background: #c9d4e6;
+  border: 1px solid #5e80a1;
+  overflow: hidden;
+}
+.combo-grade { flex: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.combo-grade:hover { background: #f6fafe; }
+.grade-val { font-weight: 600; font-size: 14px; color: #1a2c44; }
+.grade-empty { color: #8da0b5; font-weight: 400; }
+.g-good { color: #1f6e43; font-weight: 700; }
+.g-low { color: #b13b3b; font-weight: 700; }
+.combo-presence {
+  width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+}
+.pres-yes { background: #add7c0; color: #1f9755; }
+.pres-yes:hover { background: rgb(103, 166, 125); }
+.pres-no { background: #e1b5b5; color: #cc4d4d; }
+.pres-no:hover { background: #c69696; }
+.legend-row {
+  display: flex;
+  gap: 20px;
+  padding: 12px 20px;
+  border-top: 1px solid #4f7098;
+  font-size: 11px;
+  color: #2c3e66;
+  background: #6882a9;
+}
+.legend-item { display: flex; align-items: center; gap: 6px; color: #243966; }
+.leg-dot { width: 10px; height: 10px; border-radius: 3px; }
+.pres-dot { background: #57ae7e; }
+.abs-dot { background: #d35d5d; }
+.type-popup {
+  position: absolute;
+  background: rgb(22, 66, 106);
+  border-radius: 20px;
+  padding: 12px;
+  border: 1px solid #0e2c45;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.08);
+  z-index: 9999;
+  width: 280px;
+}
+.scale-popup { width: 480px; }
+.popup-label { font-size: 14px; font-weight: 600; color: #aec1df; text-align: center; margin-bottom: 16px; }
+.popup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.popup-btn {
+  border: none;
+  padding: 10px 0;
+  border-radius: 40px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  background: #87a0cf;
+  color: #1e3a5f;
+  transition: 0.1s;
+}
+.popup-btn.kr { background: #e2edfe; color: #1e4a76; }
+.popup-btn.dop { background: #e0f2fe; color: #0369a1; }
+.popup-btn.dz { background: #f0e6fe; color: #6941a1; }
+.popup-btn.dash { background: #e0f0e8; color: #1f6e43; }
+.large-btn {
+  padding: 12px 24px;
+  font-size: 16px;
+  background: #8eb2e2;
+  color: #1e3a5f;
+  width: 100%;
+}
+.scale-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-size: 14px;
+  color: white;
+  margin-bottom: 20px;
+}
+.scale-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.grade-label {
+  display: inline-block;
+  width: 80px;
+  font-weight: 600;
+}
+.scale-input {
+  width: 70px;
+  padding: 6px 10px;
+  border-radius: 24px;
+  border: none;
+  background: rgb(153, 184, 220);
+  text-align: center;
+  font-size: 14px;
+}
+.scale-actions {
+  margin-top: 8px;
+  text-align: center;
+}
+.grade-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(30, 58, 95, 0.3);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+.grade-popup {
+  background: white;
+  border-radius: 28px;
+  padding: 24px;
+  width: 280px;
+  box-shadow: 0 20px 35px -12px rgba(0,0,0,0.2);
+}
+.grade-popup-name { font-weight: 700; font-size: 1rem; margin-bottom: 4px; color: #1a2c44; text-align: center; }
+.grade-popup-sub { font-size: 12px; color: #5c6f8c; text-align: center; margin-bottom: 16px; }
+.grade-field { width: 100%; padding: 10px; border: 1px solid #cfdfed; border-radius: 32px; font-size: 20px; font-weight: 500; text-align: center; background: #f6fafe; }
+.grade-actions { display: flex; gap: 10px; margin-top: 16px; }
+.btn-cancel, .btn-ok { flex: 1; padding: 8px; border-radius: 32px; border: none; font-weight: 500; cursor: pointer; }
+.btn-cancel { background: #eef3fc; color: #1e3a5f; }
+.btn-ok { background: #2c6e9e; color: white; }
+.popup-fade-enter-active, .popup-fade-leave-active { transition: all 0.15s ease; }
+.popup-fade-enter-from { opacity: 0; transform: translateY(-6px); }
+.fade-scale-enter-active { transition: all 0.2s cubic-bezier(0.2,0.9,0.4,1.1); }
+.fade-scale-leave-active { transition: all 0.1s; }
+.fade-scale-enter-from { opacity: 0; transform: scale(0.96); }
+</style>
