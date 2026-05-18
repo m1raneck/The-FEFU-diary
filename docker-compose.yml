@@ -10,6 +10,7 @@ services:
     volumes:
       - ./database/01_init.sql:/docker-entrypoint-initdb.d/01_init.sql
       - ./database/02_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
+
     ports:
       - "5432:5432"
     restart: always
@@ -28,6 +29,7 @@ services:
       - postgres
 
   # Посещаемость
+
   attendance-service:
     build:
       context: ./services/attendance-service
@@ -65,3 +67,4 @@ services:
       - ./services/schedule-service/.env.example
     depends_on:
       - postgres
+
