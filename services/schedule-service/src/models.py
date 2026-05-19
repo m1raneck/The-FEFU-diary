@@ -16,7 +16,7 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
+    password_hash = Column(String, nullable=False)
     full_name = Column(String)
     phone = Column(String, nullable=True)
     
@@ -71,7 +71,7 @@ class Teacher(Base):
     department = Column(String, nullable=True)
 
 class Schedule(Base):
-    __tablename__ = "schedules"
+    __tablename__ = "schedule"
 
     id = Column(Integer, primary_key=True, index=True)
     group_id = Column(Integer, ForeignKey("groups.id"))

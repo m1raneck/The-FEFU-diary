@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, Date, DateTime, Text, CheckConstraint
 from sqlalchemy.sql import func
 from .database import Base
-
+from typing import List, Optional, Any
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True)
@@ -24,3 +24,4 @@ class Grade(Base):
     grade_date = Column(Date, nullable=False, server_default=func.current_date())
     comment = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
+    

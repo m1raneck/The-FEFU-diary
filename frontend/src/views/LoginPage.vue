@@ -45,7 +45,7 @@
 </template>
 
 <script>
-// import { login } from "@/services/auth"; // раскомментируй для реального бэкенда
+import { login } from "@/services/auth"; // раскомментируй для реального бэкенда
 
 export default {
   name: 'LoginPage',
@@ -94,28 +94,13 @@ export default {
     },
     
     async handleLogin() {
-      // Сначала проверяем форму
-      if (!this.validateForm()) return;
-
-      // ВСЕГДА ВХОДИМ (имитация успешного логина)
-      // Можно сохранить любой токен (например, фиктивный)
-      localStorage.setItem('token', 'fake-token-for-testing');
-      
-      // Если нужно, можно дополнительно проверить конкретный пароль,
-      // но по вашему запросу — вход всегда успешен.
-      this.$router.push('/schedule');
-      
-      // Если вы хотите использовать реальный бэкенд, но он недоступен,
-      // закомментируйте строки выше и раскомментируйте код ниже:
-      /*
-      try {
-        await login(this.form.email, this.form.password);
-        this.$router.push('/schedule');
-      } catch (e) {
-        console.error(e);
-        this.errors.password = "Неверный email или пароль";
-      }
-      */
+      if (!this.validateForm()) return
+  try {
+    await login(this.form.email, this.form.password)
+    this.$router.push('/schedule')
+  } catch (e) {
+    this.errors.password = e.message || 'Ошибка входа'
+  }
     },
     
     forgotPassword() {

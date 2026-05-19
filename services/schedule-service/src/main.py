@@ -4,7 +4,7 @@ from . import models, schemas, database
 from jose import jwt, JWTError
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import List
-
+from sqlalchemy.orm import joinedload
 app = FastAPI(title="Schedule Service")
 security = HTTPBearer()
 SECRET_KEY = "super-secret-key-for-fefu-diary"
@@ -73,7 +73,11 @@ def get_schedule(
     db: Session = Depends(database.get_db),
     current_user = Depends(get_current_user)
 ):
-    query = db.query(models.Schedule)
+    query = db.query(models.Schedule).options(
+        joinedload(models.Schedule.subject),
+        joinedload(models.Schedule.group),
+        joinedload(models.Schedule.room)
+    )
     role_names = [r.name for r in current_user.roles]
     
     if 'student' in role_names:

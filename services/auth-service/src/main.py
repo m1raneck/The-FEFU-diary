@@ -103,6 +103,22 @@ def login(credentials: schemas.UserLogin, db: Session = Depends(database.get_db)
     token = create_access_token(data={"sub": user.email, "user_id": user.id})
     return {"status": "success", "data": {"token": token}, "message": "Login successful"}
 
+@app.get("/api/users/students")
+def get_students(db: Session = Depends(database.get_db), current_user = Depends(get_current_user)):
+    """Возвращает список студентов с их id, ФИО, номером студенческого и группой."""
+    students = db.query(models.User, models.Student).join(
+        models.Student, models.User.id == models.Student.user_id
+    ).all()
+    result = []
+    for user, student in students:
+        result.append({
+            "id": student.id,
+            "full_name": user.full_name,
+            "student_number": student.student_number,
+            "group_id": student.group_id
+        })
+    return result
+
 @app.get("/api/users/me", response_model=schemas.StandardResponse)
 def read_users_me(current_user: models.User = Depends(get_current_user)):
     profile_data = {

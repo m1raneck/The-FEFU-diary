@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional, Any
 from datetime import datetime, date
+from typing import List
 
 class StandardResponse(BaseModel):
     status: str
@@ -105,3 +106,13 @@ class GroupResponse(GroupBase):
     created_at: datetime
     class Config:
         orm_mode = True
+
+class BulkGradeItem(BaseModel):
+    student_id: int
+    grade: int
+    comment: Optional[str] = None
+
+class BulkGradeRequest(BaseModel):
+    schedule_id: int
+    grade_date: date
+    grades: List[BulkGradeItem]

@@ -189,7 +189,7 @@
 </template>
 
 <script setup>
-import { ref, nextTick, onMounted, onBeforeUnmount, computed, watch } from 'vue';
+import { ref, nextTick, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 
 const props = defineProps({ subjectName: { type: String, default: 'Базы данных' } });
 const emit = defineEmits(['close']);
@@ -198,18 +198,7 @@ const emit = defineEmits(['close']);
 const dates = ['21/04', '28/04', '5/05', '12/05', '19/05'];
 const columnSettings = ref(dates.map(() => ({ type: null, max: 5 })));
 
-const students = ref([
-  { name: 'Беляев А.А.',     avg: 65, attendance: 100, records: dates.map(() => ({ grade: '', present: true })) },
-  { name: 'Васильев А.Г.',   avg: 30, attendance: 98,  records: dates.map(() => ({ grade: '', present: true })) },
-  { name: 'Геннадьева В.Д.', avg: 63, attendance: 50,  records: dates.map(() => ({ grade: '', present: false })) },
-  { name: 'Кирова Л.Д.',     avg: 58, attendance: 77,  records: dates.map(() => ({ grade: '', present: true })) },
-  { name: 'Макарова Н.В.',   avg: 52, attendance: 98,  records: dates.map(() => ({ grade: '', present: true })) },
-  { name: 'Лаврова Л.Д.',    avg: 70, attendance: 77,  records: dates.map(() => ({ grade: '', present: true })) },
-  { name: 'Никитина В.Н.',   avg: 21, attendance: 100, records: dates.map(() => ({ grade: '', present: true })) },
-  { name: 'Орлова А.А.',     avg: 0,  attendance: 0,   records: dates.map(() => ({ grade: '', present: false })) },
-  { name: 'Павлова В.Н.',    avg: 36, attendance: 50,  records: dates.map(() => ({ grade: '', present: true })) },
-]);
-
+const studentsMap = ref(new Map())
 
 const gradeScale = ref({
   from2: 0, to2: 40,
@@ -245,6 +234,23 @@ function recalcStudentStats() {
     student.avg = graded ? Math.round(totalPercent / graded) : 0;
     student.attendance = Math.round((presentCount / dates.length) * 100);
   });
+}
+async function loadStudents() {
+  const token = localStorage.getItem('token')
+  if (!token) return
+  try {
+    const res = await fetch('http://localhost/api/users/students', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    const data = await res.json()
+    const map = new Map()
+    data.forEach(s => {
+      map.set(s.full_name, s.id)
+    })
+    studentsMap.value = map
+  } catch (err) {
+    console.error('Ошибка загрузки студентов', err)
+  }
 }
 
 
@@ -369,37 +375,75 @@ function computeMultiPreview() {
   multiPreview.value = preview;
 }
 
-function applyMultiImport() {
-  let appliedCount = 0;
-  for (const col of csvScoreColumns.value) {
-    const targetColIdx = col.targetDateIdx;
-    if (col.useGradeScale) {
-      columnSettings.value[targetColIdx] = { type: 'Оценка', max: 5 };
-    } else if (!columnSettings.value[targetColIdx]?.type) {
-      // Для сырых процентов создаём тест с максимумом 100
-      columnSettings.value[targetColIdx] = { type: 'Тест', max: 100 };
-    }
-    const finalTargetMax = columnSettings.value[targetColIdx].max;
-
-    for (let rowIdx = 0; rowIdx < rawCsvRows.value.length; rowIdx++) {
-      const studentNameRaw = col.rawNames[rowIdx];
-      const student = students.value.find(s => s.name.toLowerCase() === studentNameRaw?.toLowerCase());
-      if (!student) continue;
-      let percent = col.studentScores[rowIdx];
-      let finalGrade;
-      if (col.useGradeScale) {
-        const grade = convertPercentToGrade(percent);
-        finalGrade = grade !== null ? grade : percent;
-      } else {
-        finalGrade = Math.min(percent, finalTargetMax);
-      }
-      student.records[targetColIdx].grade = finalGrade;
-    }
-    appliedCount++;
+async function applyMultiImport() {
+  if (!hasEnabledMappings.value) {
+    setImportMsg('Настройте привязку колонок к датам', 'error')
+    return
   }
-  recalcStudentStats();
-  setImportMsg(`✅ Импорт завершён: обработано ${appliedCount} колонок`, 'success');
-  cancelMultiImport();
+
+  // Собираем данные для отправки
+  // Для простоты: используем первый schedule_id из расписания для этого предмета
+  // В реальном приложении нужно получать schedule_id по subject_id + group_id + дате
+  const scheduleId = 1 // TODO: получить реальный schedule_id из расписания текущей пары
+  
+  for (const col of csvScoreColumns.value) {
+    const targetColIdx = col.targetDateIdx
+    const targetDate = dates[targetColIdx] // "21/04" → нужно преобразовать в YYYY-MM-DD
+    const gradeDate = `2025-${targetDate.split('/')[1]}-${targetDate.split('/')[0]}` // грубо, для демо
+    
+    const gradesToSend = []
+    
+    for (let rowIdx = 0; rowIdx < rawCsvRows.value.length; rowIdx++) {
+      const studentNameRaw = col.rawNames[rowIdx]
+      const student = students.value.find(s => s.name.toLowerCase() === studentNameRaw?.toLowerCase())
+      if (!student) continue
+      
+      let percent = col.studentScores[rowIdx]
+      let finalGrade = col.useGradeScale ? convertPercentToGrade(percent) : Math.min(percent, 100)
+      if (col.useGradeScale && finalGrade === null) finalGrade = percent
+      
+      // Получаем реальный student_id из БД (пока заглушка – 1)
+      const studentId = studentsMap.value.get(student.name)
+      if (!studentId) {
+       console.warn(`Студент ${student.name} не найден в БД`)
+        continue
+        }
+      
+      gradesToSend.push({
+        student_id: studentId,
+        grade: Math.round(finalGrade),
+        comment: ''
+      })
+    }
+    
+    // Отправляем на сервер
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('http://localhost/api/grades/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          schedule_id: scheduleId,
+          grade_date: gradeDate,
+          grades: gradesToSend
+        })
+      })
+      
+      const result = await response.json()
+      if (result.status === 'success') {
+        setImportMsg(`✅ Импорт завершён: ${result.message}`, 'success')
+      } else {
+        setImportMsg(`❌ Ошибка: ${result.message}`, 'error')
+      }
+    } catch (err) {
+      setImportMsg(`❌ Ошибка отправки: ${err.message}`, 'error')
+    }
+  }
+  
+  cancelMultiImport() 
 }
 
 function setImportMsg(msg, type) {
@@ -486,7 +530,11 @@ function handleClickOutside(e) {
   if (!e.target.closest('.type-popup')) closePopup();
   if (scalePopup.value.visible && !e.target.closest('.scale-popup')) scalePopup.value.visible = false;
 }
-onMounted(() => { document.addEventListener('click', handleClickOutside); recalcStudentStats(); });
+onMounted(() => {
+  loadStudents()
+  recalcStudentStats()
+  document.addEventListener('click', handleClickOutside)
+})
 onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside));
 
 

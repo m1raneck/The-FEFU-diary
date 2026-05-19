@@ -119,14 +119,14 @@ export default {
     MarksPage
   },
   async mounted() {
-    try {
-      const data = await getSchedule()
-      this.lessons = data
-    } catch (e) {
-      console.warn('Бэкенд не доступен, создаю демо-пары на текущую неделю')
-      this.generateDemoLessons()
-    }
-  },
+  try {
+    const data = await getSchedule()
+    this.lessons = this.transformSchedule(data)
+  } catch (error) {
+    console.warn('Не удалось загрузить расписание из БД, загружаю демо-пары', error)
+    this.generateDemoLessons()
+  }
+},
   data() {
     return {
       weekOffset: 0,
@@ -195,6 +195,39 @@ export default {
       const months = ['Января', 'Февраля', 'Марта', 'Апреля', 'Мая', 'Июня', 'Июля', 'Августа', 'Сентября', 'Октября', 'Ноября', 'Декабря']
       return months[monthNum - 1]
     },
+    transformSchedule(scheduleFromDB) {
+        // Преобразуем массив из БД в формат, понятный компоненту
+        const lessons = []
+        const weekDays = this.weekDays   // массив { date: '2025-05-19', name: 'ПН', dateStr: '19.05' }
+        
+        for (const item of scheduleFromDB) {
+          // weekday: 1=ПН, 2=ВТ, ..., 7=ВС
+          const dayIndex = item.weekday - 1
+          if (dayIndex < 0 || dayIndex >= weekDays.length) continue
+          
+          const dateObj = weekDays[dayIndex]
+          if (!dateObj) continue
+          
+          // lesson_number: 1 -> timeSlots[0] = '08:30'
+          const time = this.timeSlots[item.lesson_number - 1]
+          if (!time) continue
+          
+          // Название предмета – если пришло вложенным (subject.name), иначе оставляем subject_id
+          const subjectName = item.subject?.name || `Предмет ${item.subject_id}`
+          const groupName = item.group?.name || `Группа ${item.group_id}`
+          const roomNumber = item.room?.number || (item.room_id ? `Ауд. ${item.room_id}` : '')
+          
+          lessons.push({
+            id: item.id,
+            date: dateObj.date,
+            time: time,
+            name: subjectName,
+            group: groupName,
+            room: roomNumber
+          })
+        }
+        return lessons
+      },
     generateDemoLessons() {
       const demo = []
       const week = this.weekDays

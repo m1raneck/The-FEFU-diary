@@ -1,5 +1,10 @@
+version: '3.8'
+
+networks:
+  diary_network:
+    driver: bridge
+
 services:
-  # База данных
   postgres:
     image: postgres:15
     container_name: university
@@ -10,12 +15,17 @@ services:
     volumes:
       - ./database/01_init.sql:/docker-entrypoint-initdb.d/01_init.sql
       - ./database/02_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
-
     ports:
       - "5432:5432"
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d university_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - diary_network
 
-  # Аутентификация
   auth-service:
     build:
       context: ./services/auth-service
@@ -24,11 +34,12 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - ./services/auth-service/.env.example
+      - ./services/auth-service/.env.example   # используйте реальный .env, не .example
     depends_on:
-      - postgres
-
-  # Посещаемость
+      postgres:
+        condition: service_healthy
+    networks:
+      - diary_network
 
   attendance-service:
     build:
@@ -40,9 +51,11 @@ services:
     env_file:
       - ./services/attendance-service/.env.example
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+    networks:
+      - diary_network
 
-  # Оценочки
   grades-service:
     build:
       context: ./services/grades-service
@@ -53,9 +66,11 @@ services:
     env_file:
       - ./services/grades-service/.env.example
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+    networks:
+      - diary_network
 
-  # Расписание
   schedule-service:
     build:
       context: ./services/schedule-service
@@ -66,5 +81,32 @@ services:
     env_file:
       - ./services/schedule-service/.env.example
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+    networks:
+      - diary_network
 
+  gateway:
+    image: nginx:alpine
+    container_name: api_gateway
+    ports:
+      - "80:80"
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - auth-service
+      - attendance-service
+      - grades-service
+      - schedule-service
+    networks:
+      - diary_network
+
+  frontend:
+    build: ./frontend
+    container_name: diary_frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - gateway
+    networks:
+      - diary_network
