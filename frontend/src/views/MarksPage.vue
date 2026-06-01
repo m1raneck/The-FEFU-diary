@@ -1,7 +1,7 @@
 <template>
   <div class="marks-wrapper">
     <div class="marks-header">
-      <div class="group-name">Группа: <b>Б9124-09.03.03ру</b></div>
+      <div class="group-name">Группа: <b>{{ groupName || 'Загрузка...' }}</b></div>
       <div class="subject-pill">{{ subjectName }}</div>
       <button class="close-btn" @click="$emit('close')">✕</button>
     </div>
@@ -18,7 +18,6 @@
         <button v-if="importModeActive" class="scale-settings-btn" @click.stop="openScalePopup">⚙ Настроить шкалу</button>
       </div>
 
-  
       <div v-if="importModeActive" class="multi-import-container">
         <div class="mapping-table">
           <div class="mapping-row header">
@@ -60,10 +59,8 @@
         </div>
       </div>
 
-   
       <div v-if="importMessage" class="import-message" :class="importMessageType">{{ importMessage }}</div>
     </div>
-
 
     <div class="table-scroll">
       <table class="marks-table">
@@ -111,7 +108,6 @@
       </table>
     </div>
 
-    
     <div class="legend-row">
       <span class="legend-item"><span class="leg-dot pres-dot"></span>Присутствовал</span>
       <span class="legend-item"><span class="leg-dot abs-dot"></span>Отсутствовал</span>
@@ -119,21 +115,22 @@
       <span class="legend-item">Левая часть — оценка, правая — посещение</span>
     </div>
 
+    <!-- Popup для выбора типа колонки -->
     <Teleport to="body">
       <Transition name="popup-fade">
         <div v-if="popup.visible" class="type-popup" :style="{ top: popup.y+'px', left: popup.x+'px' }">
           <div class="popup-label">Тип колонки</div>
           <div class="popup-grid">
-            <button class="popup-btn kr"   @click="setType('КР', 5)">КР</button>
-            <button class="popup-btn dop"  @click="setType('ДОП', null)">ДОП</button>
-            <button class="popup-btn dz"   @click="setType('ДЗ', 100)">ДЗ</button>
+            <button class="popup-btn kr" @click="setType('КР', 5)">КР</button>
+            <button class="popup-btn dop" @click="setType('ДОП', null)">ДОП</button>
+            <button class="popup-btn dz" @click="setType('ДЗ', 100)">ДЗ</button>
             <button class="popup-btn dash" @click="setType('±', 0)">±</button>
           </div>
         </div>
       </Transition>
     </Teleport>
 
-
+    <!-- Popup для настройки шкалы -->
     <Teleport to="body">
       <Transition name="popup-fade">
         <div v-if="scalePopup.visible" class="type-popup scale-popup" :style="{ top: scalePopup.y+'px', left: scalePopup.x+'px' }" @click.stop>
@@ -167,7 +164,7 @@
       </Transition>
     </Teleport>
 
-    
+    <!-- Модалка для ввода оценки -->
     <Teleport to="body">
       <Transition name="fade-scale">
         <div v-if="gradeInput.visible" class="grade-overlay" @click.self="gradeInput.visible = false">
@@ -190,147 +187,165 @@
 
 <script setup>
 import { ref, nextTick, onMounted, onBeforeUnmount, computed, watch } from 'vue'
+import { message } from 'ant-design-vue'
 
-const props = defineProps({ subjectName: { type: String, default: 'Базы данных' } });
-const emit = defineEmits(['close']);
+const props = defineProps({ 
+  subjectName: { type: String, default: 'Базы данных' },
+  groupId: { type: Number, default: 1 },
+  groupName: { type: String, default: '' }
+})
+const emit = defineEmits(['close'])
 
-
-const dates = ['21/04', '28/04', '5/05', '12/05', '19/05'];
-const columnSettings = ref(dates.map(() => ({ type: null, max: 5 })));
-
-const studentsMap = ref(new Map())
+const dates = ['21/04', '28/04', '5/05', '12/05', '19/05']
+const columnSettings = ref(dates.map(() => ({ type: null, max: 5 })))
+const students = ref([])
+const studentsMap = ref(new Map()) // name -> student_id
 
 const gradeScale = ref({
   from2: 0, to2: 40,
   from3: 41, to3: 60,
   from4: 61, to4: 80,
   from5: 81, to5: 100
-});
-
+})
 
 function convertPercentToGrade(percent) {
-  if (percent >= gradeScale.value.from2 && percent <= gradeScale.value.to2) return 2;
-  if (percent >= gradeScale.value.from3 && percent <= gradeScale.value.to3) return 3;
-  if (percent >= gradeScale.value.from4 && percent <= gradeScale.value.to4) return 4;
-  if (percent >= gradeScale.value.from5 && percent <= gradeScale.value.to5) return 5;
-  return null;
+  if (percent >= gradeScale.value.from2 && percent <= gradeScale.value.to2) return 2
+  if (percent >= gradeScale.value.from3 && percent <= gradeScale.value.to3) return 3
+  if (percent >= gradeScale.value.from4 && percent <= gradeScale.value.to4) return 4
+  if (percent >= gradeScale.value.from5 && percent <= gradeScale.value.to5) return 5
+  return null
 }
-
 
 function recalcStudentStats() {
   students.value.forEach(student => {
-    let totalPercent = 0, graded = 0, presentCount = 0;
+    let totalPercent = 0, graded = 0, presentCount = 0
     student.records.forEach((rec, idx) => {
-      const cfg = columnSettings.value[idx];
+      const cfg = columnSettings.value[idx]
       if (cfg && cfg.max && rec.grade !== '' && rec.grade !== '+' && rec.grade !== '-') {
-        const g = parseFloat(rec.grade);
+        const g = parseFloat(rec.grade)
         if (!isNaN(g)) { 
-          totalPercent += (g / cfg.max) * 100; 
-          graded++; 
+          totalPercent += (g / cfg.max) * 100
+          graded++
         }
       }
-      if (rec.present) presentCount++;
-    });
-    student.avg = graded ? Math.round(totalPercent / graded) : 0;
-    student.attendance = Math.round((presentCount / dates.length) * 100);
-  });
+      if (rec.present) presentCount++
+    })
+    student.avg = graded ? Math.round(totalPercent / graded) : 0
+    student.attendance = Math.round((presentCount / dates.length) * 100)
+  })
 }
+
+// ========== Загрузка студентов из API ==========
 async function loadStudents() {
   const token = localStorage.getItem('token')
   if (!token) return
+  
   try {
-    const res = await fetch('http://localhost/api/users/students', {
+    const response = await fetch('http://localhost/api/users/students', {
       headers: { 'Authorization': `Bearer ${token}` }
     })
-    const data = await res.json()
-    const map = new Map()
-    data.forEach(s => {
-      map.set(s.full_name, s.id)
+    const data = await response.json()
+    
+    // Фильтруем студентов по group_id
+    const filtered = data.filter(s => s.group_id === props.groupId)
+    
+    students.value = filtered.map(s => ({
+      id: s.id,
+      name: s.full_name,
+      avg: 0,
+      attendance: 0,
+      records: dates.map(() => ({ grade: '', present: true }))
+    }))
+    
+    // Заполняем map для маппинга имён
+    filtered.forEach(s => {
+      studentsMap.value.set(s.full_name, s.id)
     })
-    studentsMap.value = map
+    
+    recalcStudentStats()
   } catch (err) {
     console.error('Ошибка загрузки студентов', err)
   }
 }
 
+// ========== CSV импорт ==========
+const importModeActive = ref(false)
+const csvScoreColumns = ref([])
+const rawCsvRows = ref([])
+const headers = ref([])
+const multiPreview = ref([])
+const importMessage = ref('')
+const importMessageType = ref('info')
+const fileInput = ref(null)
 
-function parseCSV(text) {
-  const rows = [], regex = /(?:,|^)(?:"([^"]*(?:""[^"]*)*)"|([^",]*))/g;
-  const lines = text.split(/\r?\n/);
-  for (let line of lines) {
-    if (!line.trim()) continue;
-    const row = []; let match;
-    while ((match = regex.exec(line)) !== null) row.push(match[1] !== undefined ? match[1].replace(/""/g, '"') : (match[2] || ''));
-    if (row.length) rows.push(row);
-    regex.lastIndex = 0;
-  }
-  return rows;
-}
-
-
-const importModeActive = ref(false);
-const csvScoreColumns = ref([]);
-const rawCsvRows = ref([]);
-const headers = ref([]);
-const multiPreview = ref([]);
-const importMessage = ref('');
-const importMessageType = ref('info');
-const fileInput = ref(null);
-
-const hasEnabledMappings = computed(() => csvScoreColumns.value.some(c => c.targetDateIdx !== undefined));
+const hasEnabledMappings = computed(() => csvScoreColumns.value.some(c => c.targetDateIdx !== undefined))
 
 function activateImportMode() {
-  importModeActive.value = true;
+  importModeActive.value = true
   if (csvScoreColumns.value.length === 0) {
-    setImportMsg('Загрузите CSV-файл с процентами', 'info');
+    setImportMsg('Загрузите CSV-файл с процентами', 'info')
   }
 }
 
 function cancelMultiImport() {
-  importModeActive.value = false;
-  csvScoreColumns.value = [];
-  rawCsvRows.value = [];
-  headers.value = [];
-  multiPreview.value = [];
-  setImportMsg('', 'info');
+  importModeActive.value = false
+  csvScoreColumns.value = []
+  rawCsvRows.value = []
+  headers.value = []
+  multiPreview.value = []
+  setImportMsg('', 'info')
+}
+
+function parseCSV(text) {
+  const rows = [], regex = /(?:,|^)(?:"([^"]*(?:""[^"]*)*)"|([^",]*))/g
+  const lines = text.split(/\r?\n/)
+  for (let line of lines) {
+    if (!line.trim()) continue
+    const row = []
+    let match
+    while ((match = regex.exec(line)) !== null) row.push(match[1] !== undefined ? match[1].replace(/""/g, '"') : (match[2] || ''))
+    if (row.length) rows.push(row)
+    regex.lastIndex = 0
+  }
+  return rows
 }
 
 function handleFileUpload(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
+  const file = event.target.files[0]
+  if (!file) return
+  const reader = new FileReader()
   reader.onload = (e) => {
     try {
-      const rows = parseCSV(e.target.result);
-      if (rows.length < 2) throw new Error('Файл должен содержать заголовки и данные');
-      analyzeCSVForMultiImport(rows);
+      const rows = parseCSV(e.target.result)
+      if (rows.length < 2) throw new Error('Файл должен содержать заголовки и данные')
+      analyzeCSVForMultiImport(rows)
     } catch (err) {
-      setImportMsg(err.message, 'error');
+      setImportMsg(err.message, 'error')
     }
-  };
-  reader.readAsText(file, 'UTF-8');
-  event.target.value = '';
+  }
+  reader.readAsText(file, 'UTF-8')
+  event.target.value = ''
 }
 
 function analyzeCSVForMultiImport(rows) {
-  headers.value = rows[0].map(h => h.trim());
-  const dataRows = rows.slice(1);
-  if (dataRows.length === 0) throw new Error('Нет строк с данными');
+  headers.value = rows[0].map(h => h.trim())
+  const dataRows = rows.slice(1)
+  if (dataRows.length === 0) throw new Error('Нет строк с данными')
 
-  let nameColIdx = headers.value.findIndex(h => /студент|фио|student|name/i.test(h));
-  if (nameColIdx === -1) nameColIdx = 0;
+  let nameColIdx = headers.value.findIndex(h => /студент|фио|student|name/i.test(h))
+  if (nameColIdx === -1) nameColIdx = 0
 
-  const scoreCols = [];
+  const scoreCols = []
   for (let i = 0; i < headers.value.length; i++) {
-    if (i === nameColIdx) continue;
-    const values = dataRows.map(row => parseFloat(row[i])).filter(v => !isNaN(v));
-    if (values.length === 0) continue;
-    const sampleValues = [...new Set(values.slice(0, 3))];
+    if (i === nameColIdx) continue
+    const values = dataRows.map(row => parseFloat(row[i])).filter(v => !isNaN(v))
+    if (values.length === 0) continue
+    const sampleValues = [...new Set(values.slice(0, 3))]
     const studentScores = dataRows.map(row => {
-      const val = parseFloat(row[i]);
-      return isNaN(val) ? 0 : val;
-    });
-    const rawNames = dataRows.map(row => row[nameColIdx]?.trim() || '');
+      const val = parseFloat(row[i])
+      return isNaN(val) ? 0 : val
+    })
+    const rawNames = dataRows.map(row => row[nameColIdx]?.trim() || '')
     scoreCols.push({
       header: headers.value[i],
       sampleValues,
@@ -338,41 +353,41 @@ function analyzeCSVForMultiImport(rows) {
       useGradeScale: false,
       studentScores,
       rawNames
-    });
+    })
   }
-  if (scoreCols.length === 0) throw new Error('Не найдено числовых колонок с процентами');
-  csvScoreColumns.value = scoreCols;
-  rawCsvRows.value = dataRows;
-  importModeActive.value = true;
-  computeMultiPreview();
-  setImportMsg(`Обнаружено ${scoreCols.length} колонок. Настройте импорт.`, 'success');
+  if (scoreCols.length === 0) throw new Error('Не найдено числовых колонок с процентами')
+  csvScoreColumns.value = scoreCols
+  rawCsvRows.value = dataRows
+  importModeActive.value = true
+  computeMultiPreview()
+  setImportMsg(`Обнаружено ${scoreCols.length} колонок. Настройте импорт.`, 'success')
 }
 
 function computeMultiPreview() {
-  const preview = [];
+  const preview = []
   for (const student of students.value) {
-    const studentName = student.name;
-    const mappings = [];
+    const studentName = student.name
+    const mappings = []
     for (const col of csvScoreColumns.value) {
-      const rowIdx = col.rawNames.findIndex(n => n.toLowerCase() === studentName.toLowerCase());
-      if (rowIdx === -1) continue;
-      let percent = col.studentScores[rowIdx];
-      let finalGrade;
+      const rowIdx = col.rawNames.findIndex(n => n.toLowerCase() === studentName.toLowerCase())
+      if (rowIdx === -1) continue
+      let percent = col.studentScores[rowIdx]
+      let finalGrade
       if (col.useGradeScale) {
-        const grade = convertPercentToGrade(percent);
-        finalGrade = grade !== null ? grade : percent;
+        const grade = convertPercentToGrade(percent)
+        finalGrade = grade !== null ? grade : percent
       } else {
-        finalGrade = percent;
+        finalGrade = percent
       }
       mappings.push({
         csvHeader: col.header,
         finalGrade,
         targetDateIdx: col.targetDateIdx
-      });
+      })
     }
-    if (mappings.length) preview.push({ studentName, mappings });
+    if (mappings.length) preview.push({ studentName, mappings })
   }
-  multiPreview.value = preview;
+  multiPreview.value = preview
 }
 
 async function applyMultiImport() {
@@ -381,44 +396,48 @@ async function applyMultiImport() {
     return
   }
 
-  // Собираем данные для отправки
-  // Для простоты: используем первый schedule_id из расписания для этого предмета
-  // В реальном приложении нужно получать schedule_id по subject_id + group_id + дате
-  const scheduleId = 1 // TODO: получить реальный schedule_id из расписания текущей пары
-  
+  const token = localStorage.getItem('token')
+  if (!token) {
+    setImportMsg('Нет токена авторизации', 'error')
+    return
+  }
+
+  const scheduleId = 1 // TODO: получить реальный schedule_id
+  let totalSaved = 0
+
   for (const col of csvScoreColumns.value) {
     const targetColIdx = col.targetDateIdx
-    const targetDate = dates[targetColIdx] // "21/04" → нужно преобразовать в YYYY-MM-DD
-    const gradeDate = `2025-${targetDate.split('/')[1]}-${targetDate.split('/')[0]}` // грубо, для демо
-    
+    const targetDateStr = dates[targetColIdx]
+    const [day, month] = targetDateStr.split('/')
+    const gradeDate = `2026-${month.padStart(2,'0')}-${day.padStart(2,'0')}`
+
     const gradesToSend = []
-    
+
     for (let rowIdx = 0; rowIdx < rawCsvRows.value.length; rowIdx++) {
       const studentNameRaw = col.rawNames[rowIdx]
       const student = students.value.find(s => s.name.toLowerCase() === studentNameRaw?.toLowerCase())
       if (!student) continue
-      
+
+      const studentId = studentsMap.value.get(student.name)
+      if (!studentId) {
+        console.warn(`Студент ${student.name} не найден в БД`)
+        continue
+      }
+
       let percent = col.studentScores[rowIdx]
       let finalGrade = col.useGradeScale ? convertPercentToGrade(percent) : Math.min(percent, 100)
       if (col.useGradeScale && finalGrade === null) finalGrade = percent
-      
-      // Получаем реальный student_id из БД (пока заглушка – 1)
-      const studentId = studentsMap.value.get(student.name)
-      if (!studentId) {
-       console.warn(`Студент ${student.name} не найден в БД`)
-        continue
-        }
-      
+
       gradesToSend.push({
         student_id: studentId,
         grade: Math.round(finalGrade),
         comment: ''
       })
     }
-    
-    // Отправляем на сервер
+
+    if (gradesToSend.length === 0) continue
+
     try {
-      const token = localStorage.getItem('token')
       const response = await fetch('http://localhost/api/grades/bulk', {
         method: 'POST',
         headers: {
@@ -431,135 +450,171 @@ async function applyMultiImport() {
           grades: gradesToSend
         })
       })
-      
       const result = await response.json()
       if (result.status === 'success') {
-        setImportMsg(`✅ Импорт завершён: ${result.message}`, 'success')
+        totalSaved += gradesToSend.length
+        setImportMsg(`✅ ${result.message}`, 'success')
       } else {
-        setImportMsg(`❌ Ошибка: ${result.message}`, 'error')
+        setImportMsg(`❌ Ошибка: ${result.message || 'неизвестная'}`, 'error')
       }
     } catch (err) {
-      setImportMsg(`❌ Ошибка отправки: ${err.message}`, 'error')
+      setImportMsg(`❌ Ошибка сети: ${err.message}`, 'error')
     }
   }
-  
-  cancelMultiImport() 
+
+  if (totalSaved > 0) {
+    recalcStudentStats()
+  }
+  cancelMultiImport()
 }
 
 function setImportMsg(msg, type) {
-  importMessage.value = msg;
-  importMessageType.value = type;
-  if (msg) setTimeout(() => { if (importMessage.value === msg) importMessage.value = ''; }, 4000);
+  importMessage.value = msg
+  importMessageType.value = type
+  if (msg) setTimeout(() => { if (importMessage.value === msg) importMessage.value = '' }, 4000)
 }
 
-watch(csvScoreColumns, () => { computeMultiPreview(); }, { deep: true });
+watch(csvScoreColumns, () => { computeMultiPreview() }, { deep: true })
 
-
-const scalePopup = ref({ visible: false, x: 0, y: 0 });
+// ========== Остальные методы (типы колонок, оценки, посещаемость) ==========
+const scalePopup = ref({ visible: false, x: 0, y: 0 })
 function openScalePopup(event) {
-  event.stopPropagation();
-  const rect = event.target.getBoundingClientRect();
+  event.stopPropagation()
+  const rect = event.target.getBoundingClientRect()
   scalePopup.value = {
     visible: true,
     x: Math.min(rect.left + window.scrollX - 220, window.innerWidth - 480),
     y: rect.bottom + window.scrollY + 8
-  };
+  }
 }
 function closeScalePopup() {
-  scalePopup.value.visible = false;
-  computeMultiPreview();
+  scalePopup.value.visible = false
+  computeMultiPreview()
 }
 
-const popup = ref({ visible: false, x: 0, y: 0, dIndex: null });
-const gradeInput = ref({ visible: false, sIdx: null, dIdx: null, value: '', max: 5, typeName: '', studentName: '' });
-const gradeInputRef = ref(null);
+const popup = ref({ visible: false, x: 0, y: 0, dIndex: null })
+const gradeInput = ref({ visible: false, sIdx: null, dIdx: null, value: '', max: 5, typeName: '', studentName: '' })
+const gradeInputRef = ref(null)
 
 function getAvgClass(avg) {
-  if (avg >= 70) return 'avg-good';
-  if (avg >= 40) return 'avg-mid';
-  return 'avg-bad';
+  if (avg >= 70) return 'avg-good'
+  if (avg >= 40) return 'avg-mid'
+  return 'avg-bad'
 }
-function getGradeClass(grade, dIdx) {
-  if (grade === '' || grade === '+' || grade === '-') return 'grade-empty';
-  const cfg = columnSettings.value[dIdx];
-  if (!cfg.max) return '';
-  const ratio = grade / cfg.max;
-  if (ratio >= 0.8) return 'g-good';
-  if (ratio <= 0.5) return 'g-low';
-  return '';
-}
-function openTypePopup(e, dIdx) {
-  const rect = e.target.getBoundingClientRect();
-  popup.value = { visible: true, x: Math.min(rect.left + window.scrollX - 80, window.innerWidth-280), y: rect.bottom + window.scrollY + 8, dIndex: dIdx };
-}
-function closePopup() { popup.value.visible = false; }
-function setType(type, max) {
-  const dIdx = popup.value.dIndex;
-  if (type === 'ДОП') { const c = prompt('Максимальный балл для ДОП:'); if (!c || isNaN(+c) || +c <= 0) { alert('Нужно положительное число'); return; } max = +c; }
-  students.value.forEach(s => { s.records[dIdx].grade = type === '±' ? '+' : '0'; });
-  columnSettings.value[dIdx] = { type, max };
-  recalcStudentStats();
-  closePopup();
-}
-async function editGrade(sIdx, dIdx) {
-  const cfg = columnSettings.value[dIdx];
-  if (!cfg.type) { alert('Сначала выберите тип колонки (кнопка "Оц." вверху)'); return; }
-  if (cfg.type === '±') {
-    const rec = students.value[sIdx].records[dIdx];
-    rec.grade = rec.grade === '+' ? '-' : '+';
-    recalcStudentStats();
-    return;
-  }
-  gradeInput.value = { visible: true, sIdx, dIdx, value: students.value[sIdx].records[dIdx].grade === '' ? '' : students.value[sIdx].records[dIdx].grade, max: cfg.max, typeName: cfg.type, studentName: students.value[sIdx].name };
-  await nextTick();
-  gradeInputRef.value?.focus(); gradeInputRef.value?.select();
-}
-function confirmGrade() {
-  const { sIdx, dIdx, value, max } = gradeInput.value;
-  const num = +value;
-  if (value === '' || isNaN(num) || num < 0 || num > max) { alert(`Введите число от 0 до ${max}`); return; }
-  students.value[sIdx].records[dIdx].grade = num;
-  gradeInput.value.visible = false;
-  recalcStudentStats();
-}
-function togglePresence(sIdx, dIdx) {
-  students.value[sIdx].records[dIdx].present = !students.value[sIdx].records[dIdx].present;
-  recalcStudentStats();
-}
-function handleClickOutside(e) {
-  if (!e.target.closest('.type-popup')) closePopup();
-  if (scalePopup.value.visible && !e.target.closest('.scale-popup')) scalePopup.value.visible = false;
-}
-onMounted(() => {
-  loadStudents()
-  recalcStudentStats()
-  document.addEventListener('click', handleClickOutside)
-})
-onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside));
 
+function getGradeClass(grade, dIdx) {
+  if (grade === '' || grade === '+' || grade === '-') return 'grade-empty'
+  const cfg = columnSettings.value[dIdx]
+  if (!cfg.max) return ''
+  const ratio = grade / cfg.max
+  if (ratio >= 0.8) return 'g-good'
+  if (ratio <= 0.5) return 'g-low'
+  return ''
+}
+
+function openTypePopup(e, dIdx) {
+  const rect = e.target.getBoundingClientRect()
+  popup.value = {
+    visible: true,
+    x: Math.min(rect.left + window.scrollX - 80, window.innerWidth - 280),
+    y: rect.bottom + window.scrollY + 8,
+    dIndex: dIdx
+  }
+}
+
+function closePopup() { popup.value.visible = false }
+
+function setType(type, max) {
+  const dIdx = popup.value.dIndex
+  if (type === 'ДОП') {
+    const c = prompt('Максимальный балл для ДОП:')
+    if (!c || isNaN(+c) || +c <= 0) {
+      alert('Нужно положительное число')
+      return
+    }
+    max = +c
+  }
+  students.value.forEach(s => { s.records[dIdx].grade = type === '±' ? '+' : '0' })
+  columnSettings.value[dIdx] = { type, max }
+  recalcStudentStats()
+  closePopup()
+}
+
+async function editGrade(sIdx, dIdx) {
+  const cfg = columnSettings.value[dIdx]
+  if (!cfg.type) {
+    alert('Сначала выберите тип колонки (кнопка "Оц." вверху)')
+    return
+  }
+  if (cfg.type === '±') {
+    const rec = students.value[sIdx].records[dIdx]
+    rec.grade = rec.grade === '+' ? '-' : '+'
+    recalcStudentStats()
+    return
+  }
+  gradeInput.value = {
+    visible: true,
+    sIdx, dIdx,
+    value: students.value[sIdx].records[dIdx].grade === '' ? '' : students.value[sIdx].records[dIdx].grade,
+    max: cfg.max,
+    typeName: cfg.type,
+    studentName: students.value[sIdx].name
+  }
+  await nextTick()
+  gradeInputRef.value?.focus()
+  gradeInputRef.value?.select()
+}
+
+function confirmGrade() {
+  const { sIdx, dIdx, value, max } = gradeInput.value
+  const num = +value
+  if (value === '' || isNaN(num) || num < 0 || num > max) {
+    alert(`Введите число от 0 до ${max}`)
+    return
+  }
+  students.value[sIdx].records[dIdx].grade = num
+  gradeInput.value.visible = false
+  recalcStudentStats()
+}
+
+function togglePresence(sIdx, dIdx) {
+  students.value[sIdx].records[dIdx].present = !students.value[sIdx].records[dIdx].present
+  recalcStudentStats()
+}
+
+function handleClickOutside(e) {
+  if (!e.target.closest('.type-popup')) closePopup()
+  if (scalePopup.value.visible && !e.target.closest('.scale-popup')) scalePopup.value.visible = false
+}
 
 function downloadSampleCSV() {
   const sampleRows = [
     ['Студент', 'Тест 1 (%)', 'Тест 2 (%)'],
-    ['Беляев А.А.', '85', '64'],
-    ['Васильев А.Г.', '42', '33'],
-    ['Геннадьева В.Д.', '78', '91'],
-    ['Кирова Л.Д.', '94', '73'],
-    ['Макарова Н.В.', '55', '48'],
-    ['Лаврова Л.Д.', '97', '86'],
-    ['Никитина В.Н.', '23', '19'],
-    ['Орлова А.А.', '0', '0'],
-    ['Павлова В.Н.', '39', '31']
-  ];
-  const csv = sampleRows.map(r => r.join(',')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = 'example_marks.csv'; a.click(); URL.revokeObjectURL(a.href);
+    ['Ковалёв Леонид', '85', '64'],
+    ['Шварц Анжелика', '42', '33'],
+    ['Углицкий Евгений', '78', '91'],
+    ['Смирнов Григорий', '94', '73']
+  ]
+  const csv = sampleRows.map(r => r.join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = 'example_marks.csv'
+  a.click()
+  URL.revokeObjectURL(a.href)
 }
+
+// ========== Жизненный цикл ==========
+onMounted(() => {
+  loadStudents()
+  document.addEventListener('click', handleClickOutside)
+})
+
+onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
 </script>
 
 <style scoped>
-
+/* твои старые стили остаются без изменений */
 .marks-wrapper {
   display: flex;
   flex-direction: column;

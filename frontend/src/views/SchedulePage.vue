@@ -99,7 +99,12 @@
       <Transition name="marks-modal">
         <div v-if="marksModalVisible" class="marks-overlay" @click.self="marksModalVisible = false">
           <div class="marks-modal-glass">
-            <MarksPage :subjectName="currentSubject" @close="marksModalVisible = false" />
+            <MarksPage 
+  :subjectName="currentSubject" 
+  :groupId="currentGroupId"
+  :groupName="currentGroupName"
+  @close="marksModalVisible = false" 
+/>
           </div>
         </div>
       </Transition>
@@ -135,7 +140,8 @@ export default {
       // для модалки журнала
       marksModalVisible: false,
       currentSubject: '',
-      // для модалки редактирования
+      currentGroupId: null,    
+      currentGroupName: '',
       modalVisible: false,
       editingLesson: null,
       formData: {
@@ -196,38 +202,29 @@ export default {
       return months[monthNum - 1]
     },
     transformSchedule(scheduleFromDB) {
-        // Преобразуем массив из БД в формат, понятный компоненту
-        const lessons = []
-        const weekDays = this.weekDays   // массив { date: '2025-05-19', name: 'ПН', dateStr: '19.05' }
-        
-        for (const item of scheduleFromDB) {
-          // weekday: 1=ПН, 2=ВТ, ..., 7=ВС
-          const dayIndex = item.weekday - 1
-          if (dayIndex < 0 || dayIndex >= weekDays.length) continue
-          
-          const dateObj = weekDays[dayIndex]
-          if (!dateObj) continue
-          
-          // lesson_number: 1 -> timeSlots[0] = '08:30'
-          const time = this.timeSlots[item.lesson_number - 1]
-          if (!time) continue
-          
-          // Название предмета – если пришло вложенным (subject.name), иначе оставляем subject_id
-          const subjectName = item.subject?.name || `Предмет ${item.subject_id}`
-          const groupName = item.group?.name || `Группа ${item.group_id}`
-          const roomNumber = item.room?.number || (item.room_id ? `Ауд. ${item.room_id}` : '')
-          
-          lessons.push({
-            id: item.id,
-            date: dateObj.date,
-            time: time,
-            name: subjectName,
-            group: groupName,
-            room: roomNumber
-          })
-        }
-        return lessons
-      },
+  const lessons = []
+  const weekDays = this.weekDays
+  
+  for (const item of scheduleFromDB) {
+    const dayIndex = item.weekday - 1
+    if (dayIndex < 0 || dayIndex >= weekDays.length) continue
+    const dateObj = weekDays[dayIndex]
+    if (!dateObj) continue
+    const time = this.timeSlots[item.lesson_number - 1]
+    if (!time) continue
+    
+    lessons.push({
+      id: item.id,
+      date: dateObj.date,
+      time: time,
+      name: item.subject?.name || `Предмет ${item.subject_id}`,
+      group: item.group?.name || `Группа ${item.group_id}`,
+      group_id: item.group_id,           // добавить
+      room: item.room?.number || ''
+    })
+  }
+  return lessons
+},
     generateDemoLessons() {
       const demo = []
       const week = this.weekDays
@@ -286,6 +283,9 @@ export default {
     openMarksModal(lesson) {
       if (!lesson) return
       this.currentSubject = lesson.name
+      // Сохраняем group_id и group_name из расписания
+      this.currentGroupId = lesson.group_id || 1
+      this.currentGroupName = lesson.group || 'Группа'
       this.marksModalVisible = true
     },
     // Методы для модалки редактирования
