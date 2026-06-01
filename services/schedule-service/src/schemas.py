@@ -39,7 +39,6 @@ class RoomBase(BaseModel):
     number: str
     building: Optional[str] = None
 
-
 class RoomResponse(RoomBase):
     id: int
     class Config:
@@ -55,6 +54,17 @@ class ScheduleBase(BaseModel):
     semester: int
     year: int
 
+class GroupBase(BaseModel):
+    name: str
+    course: int
+    year: int
+
+
+class GroupResponse(GroupBase):
+    id: int
+    created_at: datetime
+    class Config:
+        orm_mode = True
 
 class ScheduleResponse(ScheduleBase):
     id: int
@@ -93,18 +103,6 @@ class AttendanceCreate(AttendanceBase):
 class AttendanceResponse(AttendanceBase):
     id: int
     date: date
-    created_at: datetime
-    class Config:
-        orm_mode = True
-
-class GroupBase(BaseModel):
-    name: str
-    course: int
-    year: int
-
-
-class GroupResponse(GroupBase):
-    id: int
     created_at: datetime
     class Config:
         orm_mode = True

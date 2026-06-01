@@ -95,13 +95,21 @@ def register(user_data: schemas.UserCreate, db: Session = Depends(database.get_d
 
 @app.post("/api/auth/login", response_model=schemas.StandardResponse)
 def login(credentials: schemas.UserLogin, db: Session = Depends(database.get_db)):
-    user = db.query(models.User).filter(models.User.email == credentials.login).first()
+    try:
+        # 1. Сначала ищем пользователя
+        user = db.query(models.User).filter(models.User.email == credentials.login).first()
 
-    if not user or not verify_password(credentials.password, user.password_hash):
-        return {"status": "error", "message": "Invalid credentials"}
+        # 2. Если пользователя нет ИЛИ пароль не подошел
+        if not user or not verify_password(credentials.password, user.password_hash):
+            return {"status": "error", "data": None, "message": "Invalid credentials"}
 
-    token = create_access_token(data={"sub": user.email, "user_id": user.id})
-    return {"status": "success", "data": {"token": token}, "message": "Login successful"}
+        # 3. Если всё ок — генерируем токен
+        token = create_access_token(data={"sub": user.email, "user_id": user.id})
+        return {"status": "success", "data": {"token": token}, "message": "Login successful"}
+
+    except Exception as e:
+        # Если упала база данных, мы гарантируем, что вернется ошибка, и код не пойдет дальше
+        return {"status": "error", "data": None, "message": f"Database error: {str(e)}"}
 
 @app.post("/api/auth/register-teacher", response_model=schemas.StandardResponse, status_code=status.HTTP_201_CREATED)
 def register_teacher(teacher_data: schemas.TeacherCreate, db: Session = Depends(database.get_db)):

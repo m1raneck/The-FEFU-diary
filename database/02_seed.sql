@@ -130,3 +130,32 @@ FROM students s JOIN users u ON s.user_id = u.id CROSS JOIN schedule sch
 WHERE u.email = 'petrov@student.ru' AND sch.year = 2024 AND sch.semester = 1
   AND EXISTS (SELECT 1 FROM subjects sub WHERE sub.name = 'Базы данных' AND sch.subject_id = sub.id)
 ON CONFLICT DO NOTHING;
+
+-- На всякий случай добавляем Дербенцеву пары и на 1-й, и на 2-й семестр, 
+-- а также дублируем их на 2024 и 2026 годы, чтобы обойти любые скрытые фильтры года/семестра
+
+-- ПОНЕДЕЛЬНИК (1 июня) — 2 пара (10:10)
+INSERT INTO schedule (group_id, subject_id, teacher_id, room_id, weekday, lesson_number, semester, year)
+SELECT g.id, s.id, t.id, r.id, 1, 2, 1, 2026
+FROM groups g CROSS JOIN subjects s CROSS JOIN teachers t CROSS JOIN rooms r JOIN users u ON t.user_id = u.id
+WHERE g.name = 'Б9124-09.03.03ру' AND s.name = 'Проектная деятельность' AND u.email = 'derbentcev.no@dvfu.ru' AND r.number = '101'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO schedule (group_id, subject_id, teacher_id, room_id, weekday, lesson_number, semester, year)
+SELECT g.id, s.id, t.id, r.id, 1, 2, 2, 2026
+FROM groups g CROSS JOIN subjects s CROSS JOIN teachers t CROSS JOIN rooms r JOIN users u ON t.user_id = u.id
+WHERE g.name = 'Б9124-09.03.03ру' AND s.name = 'Проектная деятельность' AND u.email = 'derbentcev.no@dvfu.ru' AND r.number = '101'
+ON CONFLICT DO NOTHING;
+
+-- ВТОРНИК (2 июня) — 3 пара (11:50)
+INSERT INTO schedule (group_id, subject_id, teacher_id, room_id, weekday, lesson_number, semester, year)
+SELECT g.id, s.id, t.id, r.id, 2, 3, 1, 2026
+FROM groups g CROSS JOIN subjects s CROSS JOIN teachers t CROSS JOIN rooms r JOIN users u ON t.user_id = u.id
+WHERE g.name = 'Б9124-09.03.03ру' AND s.name = 'Проектная деятельность' AND u.email = 'derbentcev.no@dvfu.ru' AND r.number = '102'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO schedule (group_id, subject_id, teacher_id, room_id, weekday, lesson_number, semester, year)
+SELECT g.id, s.id, t.id, r.id, 2, 3, 2, 2026
+FROM groups g CROSS JOIN subjects s CROSS JOIN teachers t CROSS JOIN rooms r JOIN users u ON t.user_id = u.id
+WHERE g.name = 'Б9124-09.03.03ру' AND s.name = 'Проектная деятельность' AND u.email = 'derbentcev.no@dvfu.ru' AND r.number = '102'
+ON CONFLICT DO NOTHING;

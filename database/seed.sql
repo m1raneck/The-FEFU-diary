@@ -151,3 +151,36 @@ SELECT u.full_name, att.status, att.date
 FROM attendance att
 JOIN students s ON att.student_id = s.id
 JOIN users u ON s.user_id = u.id;
+
+-- 1. Сначала убедимся, что Дербенцев есть в таблице teachers (если его там нет)
+INSERT INTO teachers (user_id, department)
+SELECT id, 'Кафедра математических методов' FROM users WHERE email = 'derbentcev.no@dvfu.ru'
+ON CONFLICT DO NOTHING;
+
+-- 2. Добавляем занятие для Дербенцева у группы Б9124-09.03.03ру (Понедельник, 1 пара)
+INSERT INTO schedule (group_id, subject_id, teacher_id, room_id, weekday, lesson_number, semester, year)
+SELECT g.id, s.id, t.id, r.id, 1, 1, 2, 2026
+FROM groups g 
+CROSS JOIN subjects s 
+CROSS JOIN teachers t 
+CROSS JOIN rooms r
+JOIN users u ON t.user_id = u.id
+WHERE g.name = 'Б9124-09.03.03ру' 
+  AND s.name = 'Проектная деятельность'
+  AND u.email = 'derbentcev.no@dvfu.ru'
+  AND r.number = '101'
+ON CONFLICT DO NOTHING;
+
+
+INSERT INTO schedule (group_id, subject_id, teacher_id, room_id, weekday, lesson_number, semester, year)
+SELECT g.id, s.id, t.id, r.id, 2, 2, 2, 2026
+FROM groups g 
+CROSS JOIN subjects s 
+CROSS JOIN teachers t 
+CROSS JOIN rooms r
+JOIN users u ON t.user_id = u.id
+WHERE g.name = 'Б9125-09.03.04ру' 
+  AND s.name = 'Проектная деятельность'
+  AND u.email = 'derbentcev.no@dvfu.ru'
+  AND r.number = '102'
+ON CONFLICT DO NOTHING;
