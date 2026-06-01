@@ -106,3 +106,10 @@ class AttendanceResponse(AttendanceBase):
     created_at: datetime
     class Config:
         orm_mode = True
+
+
+class GroupBase(BaseModel):
+    name: str
+    course: int
+    year: int
+
