@@ -13,6 +13,7 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: university_db
     volumes:
+      - postgres_data:/var/lib/postgresql/data   # постоянное хранилище
       - ./database/01_init.sql:/docker-entrypoint-initdb.d/01_init.sql
       - ./database/02_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
       - ./database/03_students.sql:/docker-entrypoint-initdb.d/03_students.sql
@@ -111,3 +112,5 @@ services:
       - gateway
     networks:
       - diary_network
+volumes:
+  postgres_data:
