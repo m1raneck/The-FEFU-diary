@@ -55,6 +55,14 @@ class ScheduleBase(BaseModel):
     semester: int
     year: int
 
+class GroupResponse(BaseModel):
+    id: int
+    name: str
+    course: int
+    year: int
+    created_at: datetime
+    class Config:
+        orm_mode = True
 
 class ScheduleResponse(ScheduleBase):
     id: int
@@ -103,8 +111,3 @@ class GroupBase(BaseModel):
     year: int
 
 
-class GroupResponse(GroupBase):
-    id: int
-    created_at: datetime
-    class Config:
-        orm_mode = True
