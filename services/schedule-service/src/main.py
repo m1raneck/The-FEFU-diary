@@ -65,7 +65,7 @@ def create_room(room: schemas.RoomBase, db: Session = Depends(database.get_db), 
     return new_room
 
 
-@app.get("/api/schedule", response_model=List[schemas.ScheduleResponse])
+@app.get("/api/schedule")
 def get_schedule(
     group_id: int = None,
     teacher_id: int = None,
@@ -79,12 +79,12 @@ def get_schedule(
         joinedload(models.Schedule.room)
     )
     role_names = [r.name for r in current_user.roles]
-    
+
     if 'student' in role_names:
         student = db.query(models.Student).filter(models.Student.user_id == current_user.id).first()
         if student and student.group_id:
             query = query.filter(models.Schedule.group_id == student.group_id)
-            
+
     elif 'teacher' in role_names:
         teacher = db.query(models.Teacher).filter(models.Teacher.user_id == current_user.id).first()
         if teacher:
@@ -96,8 +96,42 @@ def get_schedule(
         query = query.filter(models.Schedule.teacher_id == teacher_id)
     if weekday:
         query = query.filter(models.Schedule.weekday == weekday)
-        
-    return query.all()
+
+    schedules = query.all()
+
+    result = []
+    for sched in schedules:
+        result.append({
+            "id": sched.id,
+            "group_id": sched.group_id,
+            "subject_id": sched.subject_id,
+            "teacher_id": sched.teacher_id,
+            "room_id": sched.room_id,
+            "weekday": sched.weekday,
+            "lesson_number": sched.lesson_number,
+            "semester": sched.semester,
+            "year": sched.year,
+            "created_at": sched.created_at,
+            "subject": {
+                "id": sched.subject.id,
+                "name": sched.subject.name,
+                "short_name": sched.subject.short_name,
+                "description": sched.subject.description
+            } if sched.subject else None,
+            "group": {
+                "id": sched.group.id,
+                "name": sched.group.name,
+                "course": sched.group.course,
+                "year": sched.group.year
+            } if sched.group else None,
+            "room": {
+                "id": sched.room.id,
+                "number": sched.room.number,
+                "building": sched.room.building
+            } if sched.room else None
+        })
+
+    return result
 
 @app.post("/api/schedule", response_model=schemas.ScheduleResponse)
 def create_schedule(sched: schemas.ScheduleBase, db: Session = Depends(database.get_db), _=Depends(get_teacher_role)):

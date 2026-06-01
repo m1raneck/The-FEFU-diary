@@ -59,6 +59,9 @@ class ScheduleBase(BaseModel):
 class ScheduleResponse(ScheduleBase):
     id: int
     created_at: datetime
+    subject: Optional[SubjectResponse] = None
+    group: Optional[GroupResponse] = None
+    room: Optional[RoomResponse] = None
     class Config:
         orm_mode = True
 

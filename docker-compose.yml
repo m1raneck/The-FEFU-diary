@@ -15,6 +15,7 @@ services:
     volumes:
       - ./database/01_init.sql:/docker-entrypoint-initdb.d/01_init.sql
       - ./database/02_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
+      - ./database/03_students.sql:/docker-entrypoint-initdb.d/03_students.sql
     ports:
       - "5432:5432"
     restart: always
@@ -34,7 +35,7 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - ./services/auth-service/.env.example   # используйте реальный .env, не .example
+      - ./services/auth-service/.env.example
     depends_on:
       postgres:
         condition: service_healthy
