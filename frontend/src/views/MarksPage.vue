@@ -187,7 +187,6 @@
 
 <script setup>
 import { ref, nextTick, onMounted, onBeforeUnmount, computed, watch } from 'vue'
-import { message } from 'ant-design-vue'
 
 const props = defineProps({ 
   subjectName: { type: String, default: 'Базы данных' },
@@ -199,7 +198,7 @@ const emit = defineEmits(['close'])
 const dates = ['21/04', '28/04', '5/05', '12/05', '19/05']
 const columnSettings = ref(dates.map(() => ({ type: null, max: 5 })))
 const students = ref([])
-const studentsMap = ref(new Map()) // name -> student_id
+const studentsMap = ref(new Map())
 
 const gradeScale = ref({
   from2: 0, to2: 40,
@@ -246,7 +245,6 @@ async function loadStudents() {
     })
     const data = await response.json()
     
-    // Фильтруем студентов по group_id
     const filtered = data.filter(s => s.group_id === props.groupId)
     
     students.value = filtered.map(s => ({
@@ -257,7 +255,6 @@ async function loadStudents() {
       records: dates.map(() => ({ grade: '', present: true }))
     }))
     
-    // Заполняем map для маппинга имён
     filtered.forEach(s => {
       studentsMap.value.set(s.full_name, s.id)
     })
@@ -398,18 +395,18 @@ async function applyMultiImport() {
 
   const token = localStorage.getItem('token')
   if (!token) {
-    setImportMsg('Нет токена авторизации', 'error')
+    setImportMsg('Нет токена авторизации. Войдите как преподаватель.', 'error')
     return
   }
 
-  const scheduleId = 1 // TODO: получить реальный schedule_id
+  const scheduleId = 1
   let totalSaved = 0
 
   for (const col of csvScoreColumns.value) {
     const targetColIdx = col.targetDateIdx
     const targetDateStr = dates[targetColIdx]
     const [day, month] = targetDateStr.split('/')
-    const gradeDate = `2026-${month.padStart(2,'0')}-${day.padStart(2,'0')}`
+    const gradeDate = `2026-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
 
     const gradesToSend = []
 
@@ -464,6 +461,9 @@ async function applyMultiImport() {
 
   if (totalSaved > 0) {
     recalcStudentStats()
+    setImportMsg(`✅ Сохранено ${totalSaved} оценок`, 'success')
+  } else {
+    setImportMsg('❌ Не удалось сохранить ни одной оценки', 'error')
   }
   cancelMultiImport()
 }
@@ -476,7 +476,7 @@ function setImportMsg(msg, type) {
 
 watch(csvScoreColumns, () => { computeMultiPreview() }, { deep: true })
 
-// ========== Остальные методы (типы колонок, оценки, посещаемость) ==========
+// ========== Остальные методы ==========
 const scalePopup = ref({ visible: false, x: 0, y: 0 })
 function openScalePopup(event) {
   event.stopPropagation()
@@ -604,7 +604,6 @@ function downloadSampleCSV() {
   URL.revokeObjectURL(a.href)
 }
 
-// ========== Жизненный цикл ==========
 onMounted(() => {
   loadStudents()
   document.addEventListener('click', handleClickOutside)
@@ -614,7 +613,6 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
 </script>
 
 <style scoped>
-/* твои старые стили остаются без изменений */
 .marks-wrapper {
   display: flex;
   flex-direction: column;
