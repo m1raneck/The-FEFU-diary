@@ -4,10 +4,15 @@
     <div class="top-header"></div>
     <div class="top-right">
       <div class="avatar-circle"></div>
-      <div class="avatar-text">ГС</div>
+      <div class="avatar-text">{{ initials }}</div>
       <a-button class="logout-btn" @click="logout" type="link">
         <span class="logout-icon">→</span> Выйти
       </a-button>
+    </div>
+
+    <div v-if="isStudent" class="page-nav">
+      <router-link to="/schedule" class="nav-link active">Расписание</router-link>
+      <router-link to="/my-grades" class="nav-link">Мои оценки</router-link>
     </div>
 
     <div class="header-section">
@@ -54,11 +59,13 @@
               v-for="day in weekDays"
               :key="day.date"
               class="lesson-cell"
-              @click="openMarksModal(getLesson(day.date, time))"
+              @click="onLessonClick(getLesson(day.date, time))"
             >
               <div v-if="getLesson(day.date, time)" class="lesson-block">
                 <div class="lesson-title">{{ getLesson(day.date, time).name }}</div>
-                <div class="lesson-group">{{ getLesson(day.date, time).group }}</div>
+                <div class="lesson-group">
+                  {{ isStudent ? lessonSubtitle(getLesson(day.date, time)) : getLesson(day.date, time).group }}
+                </div>
               </div>
             </td>
           </tr>
@@ -94,17 +101,33 @@
       </a-form>
     </a-modal>
 
-    <!-- Красивое полупрозрачное всплывающее окно журнала оценок -->
+    <!-- Журнал оценок (преподаватель) -->
     <Teleport to="body">
       <Transition name="marks-modal">
         <div v-if="marksModalVisible" class="marks-overlay" @click.self="marksModalVisible = false">
           <div class="marks-modal-glass">
             <MarksPage 
-  :subjectName="currentSubject" 
-  :groupId="currentGroupId"
-  :groupName="currentGroupName"
-  @close="marksModalVisible = false" 
-/>
+              :subjectName="currentSubject" 
+              :groupId="currentGroupId"
+              :groupName="currentGroupName"
+              :scheduleId="currentScheduleId"
+              @close="marksModalVisible = false" 
+            />
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Просмотр оценок (студент) -->
+    <Teleport to="body">
+      <Transition name="marks-modal">
+        <div v-if="studentMarksVisible" class="marks-overlay" @click.self="studentMarksVisible = false">
+          <div class="marks-modal-glass student-modal">
+            <StudentMarksPage
+              :subjectName="currentSubject"
+              :scheduleId="currentScheduleId"
+              @close="studentMarksVisible = false"
+            />
           </div>
         </div>
       </Transition>
@@ -117,31 +140,41 @@ import { getSchedule } from '@/services/schedule'
 import { timeSlots } from '../data/scheduleData.js'
 import { message } from 'ant-design-vue'
 import MarksPage from '@/views/MarksPage.vue'
+import StudentMarksPage from '@/views/StudentMarksPage.vue'
+import { getStoredUser, fetchAndStoreProfile, logout as authLogout, isStudent } from '@/services/auth'
 
 export default {
   name: 'SchedulePage',
   components: {
-    MarksPage
+    MarksPage,
+    StudentMarksPage
   },
   async mounted() {
-  try {
-    const data = await getSchedule()
-    this.lessons = this.transformSchedule(data)
-  } catch (error) {
-    console.warn('Не удалось загрузить расписание из БД, загружаю демо-пары', error)
-    this.generateDemoLessons()
-  }
-},
+    try {
+      if (!this.user) this.user = await fetchAndStoreProfile()
+    } catch (e) {
+      console.warn('Не удалось загрузить профиль', e)
+    }
+    try {
+      const data = await getSchedule()
+      this.lessons = this.transformSchedule(data)
+    } catch (error) {
+      console.warn('Не удалось загрузить расписание из БД', error)
+      if (!this.isStudent) this.generateDemoLessons()
+    }
+  },
   data() {
     return {
+      user: getStoredUser(),
       weekOffset: 0,
       timeSlots,
       lessons: [],
-      // для модалки журнала
       marksModalVisible: false,
+      studentMarksVisible: false,
       currentSubject: '',
       currentGroupId: null,    
       currentGroupName: '',
+      currentScheduleId: null,
       modalVisible: false,
       editingLesson: null,
       formData: {
@@ -154,6 +187,13 @@ export default {
     }
   },
   computed: {
+    isStudent() {
+      return isStudent(this.user)
+    },
+    initials() {
+      const name = this.user?.full_name || ''
+      return name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'ГС'
+    },
     weekDays() {
       const now = new Date()
       const today = now.getDay()
@@ -219,7 +259,7 @@ export default {
       time: time,
       name: item.subject?.name || `Предмет ${item.subject_id}`,
       group: item.group?.name || `Группа ${item.group_id}`,
-      group_id: item.group_id,           // добавить
+      group_id: item.group_id,
       room: item.room?.number || ''
     })
   }
@@ -276,16 +316,30 @@ export default {
       this.weekOffset++
     },
     logout() {
-      localStorage.removeItem('token')
+      authLogout()
       this.$router.push('/')
     },
-    // Метод открытия журнала (клик по паре)
+    lessonSubtitle(lesson) {
+      const parts = []
+      if (lesson.room) parts.push(`ауд. ${lesson.room}`)
+      return parts.join(' · ') || 'Пара'
+    },
+    onLessonClick(lesson) {
+      if (!lesson) return
+      this.currentSubject = lesson.name
+      this.currentScheduleId = lesson.id || null
+      if (this.isStudent) {
+        this.studentMarksVisible = true
+      } else {
+        this.openMarksModal(lesson)
+      }
+    },
     openMarksModal(lesson) {
       if (!lesson) return
       this.currentSubject = lesson.name
-      // Сохраняем group_id и group_name из расписания
       this.currentGroupId = lesson.group_id || 1
       this.currentGroupName = lesson.group || 'Группа'
+      this.currentScheduleId = lesson.id || null
       this.marksModalVisible = true
     },
     // Методы для модалки редактирования
@@ -362,6 +416,32 @@ export default {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+.page-nav {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 0 0;
+}
+.nav-link {
+  padding: 8px 24px;
+  border-radius: 40px;
+  background: rgba(238, 245, 255, 0.7);
+  color: #1e3a5f;
+  text-decoration: none;
+  font-weight: 500;
+  border: 1px solid #5a9ac0;
+  transition: 0.2s;
+}
+.nav-link.active, .nav-link:hover {
+  background: #5a9ac0;
+  color: #fff;
+}
+.marks-modal-glass.student-modal {
+  max-width: 700px;
 }
 
 .schedule-container {

@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import LoginPage from '@/views/LoginPage.vue'
 import ForgotPassword from '@/views/ForgotPassword.vue'
 import SchedulePage from '@/views/SchedulePage.vue'
+import StudentGradesPage from '@/views/StudentGradesPage.vue'
+import { getStoredUser, isStudent } from '@/services/auth'
 
 const routes = [
   {
@@ -19,6 +21,12 @@ const routes = [
     name: 'Schedule',
     component: SchedulePage,
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/my-grades',
+    name: 'MyGrades',
+    component: StudentGradesPage,
+    meta: { requiresAuth: true, studentOnly: true }
   }
 ]
 
@@ -27,13 +35,16 @@ const router = createRouter({
   routes
 })
 
-// Защита маршрутов — если нет токена, редирект на логин
 router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth && !localStorage.getItem('token')) {
     next('/')
-  } else {
-    next()
+    return
   }
+  if (to.meta.studentOnly && !isStudent(getStoredUser())) {
+    next('/schedule')
+    return
+  }
+  next()
 })
 
 export default router

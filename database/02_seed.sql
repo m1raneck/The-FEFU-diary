@@ -23,7 +23,9 @@ INSERT INTO rooms (number, building, capacity) VALUES
     ('401', 'Лабораторный корпус', 15),
     ('D547', 'Корпус D', 31),
     ('D740', 'Корпус D', 26),
-    ('D945', 'Корпус D', 25)
+    ('D945', 'Корпус D', 25),
+    ('408', 'Корпус D', 30),
+    ('215', 'Главный корпус', 25)
 ON CONFLICT (number) DO NOTHING;
 
 INSERT INTO subjects (name, short_name, description, credits) VALUES
@@ -91,7 +93,7 @@ WHERE g.name = 'Б9125-02.03.01мо' AND s.name = 'Проектная деяте
 ON CONFLICT DO NOTHING;
 
 INSERT INTO users (email, password_hash, full_name, phone)
-SELECT 'petrov@student.ru', 'hash_student_123', 'Петров Петр Петрович', '+7-900-333-4455'
+SELECT 'petrov@student.ru', '$2b$12$wXp11PgvF2xiwaw0BkqdOuXd/Q2fahznvMJhd88L9xLvKY3U3XK56', 'Петров Петр Петрович', '+7-900-333-4455'
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'petrov@student.ru');
 
 INSERT INTO user_roles (user_id, role_id)

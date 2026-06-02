@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import text
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
@@ -79,6 +80,10 @@ def register(user_data: schemas.UserCreate, db: Session = Depends(database.get_d
             address=user_data.address
         )
         db.add(new_student)
+
+        role = db.query(models.Role).filter(models.Role.name == 'student').first()
+        if role:
+            db.add(models.UserRole(user_id=new_user.id, role_id=role.id))
         
         db.commit()
         db.refresh(new_user)
@@ -161,24 +166,48 @@ def get_students(db: Session = Depends(database.get_db), current_user = Depends(
     return result
 
 @app.get("/api/users/me", response_model=schemas.StandardResponse)
-def read_users_me(current_user: models.User = Depends(get_current_user)):
+def read_users_me(current_user: models.User = Depends(get_current_user), db: Session = Depends(database.get_db)):
+    user = db.query(models.User).options(
+        joinedload(models.User.student_profile).joinedload(models.Student.group),
+        joinedload(models.User.teacher_profile)
+    ).filter(models.User.id == current_user.id).first()
+
+    role_rows = db.execute(
+        text("SELECT r.name FROM user_roles ur JOIN roles r ON ur.role_id = r.id WHERE ur.user_id = :uid"),
+        {"uid": current_user.id}
+    ).fetchall()
+    roles = [row[0] for row in role_rows]
+
     profile_data = {
-        "id": current_user.id,
-        "email": current_user.email,
-        "full_name": current_user.full_name,
-        "phone": current_user.phone,
-        "student_info": None
+        "id": user.id,
+        "email": user.email,
+        "full_name": user.full_name,
+        "phone": user.phone,
+        "roles": roles,
+        "student_info": None,
+        "teacher_info": None
     }
-    
-    if current_user.student_profile:
-        sp = current_user.student_profile
+
+    if user.student_profile:
+        sp = user.student_profile
         profile_data["student_info"] = {
+            "student_id": sp.id,
             "student_number": sp.student_number,
             "group_id": sp.group_id,
+            "group_name": sp.group.name if sp.group else None,
             "enrollment_year": sp.enrollment_year,
             "address": sp.address
         }
-        
+
+    if user.teacher_profile:
+        tp = user.teacher_profile
+        profile_data["teacher_info"] = {
+            "teacher_id": tp.id,
+            "department": tp.department,
+            "position": tp.position,
+            "degree": tp.degree
+        }
+
     return {
         "status": "success",
         "data": profile_data,

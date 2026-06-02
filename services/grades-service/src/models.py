@@ -20,7 +20,7 @@ class Grade(Base):
     id = Column(Integer, primary_key=True, index=True)
     student_id = Column(Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
     schedule_id = Column(Integer, ForeignKey("schedule.id", ondelete="CASCADE"), nullable=False)
-    grade = Column(Integer, CheckConstraint("grade BETWEEN 2 AND 5"))
+    grade = Column(Integer, CheckConstraint("grade BETWEEN 0 AND 100"))
     grade_date = Column(Date, nullable=False, server_default=func.current_date())
     comment = Column(Text)
     created_at = Column(DateTime, server_default=func.now())

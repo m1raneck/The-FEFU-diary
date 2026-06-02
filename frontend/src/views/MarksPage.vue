@@ -187,12 +187,13 @@
 
 <script setup>
 import { ref, nextTick, onMounted, onBeforeUnmount, computed, watch } from 'vue'
-import { message } from 'ant-design-vue'
+import { getStudents, getGrades, getAttendance, saveGrade, saveAttendance, bulkSaveGrades } from '@/services/marks'
 
 const props = defineProps({ 
   subjectName: { type: String, default: 'Базы данных' },
   groupId: { type: Number, default: 1 },
-  groupName: { type: String, default: '' }
+  groupName: { type: String, default: '' },
+  scheduleId: { type: Number, default: null }
 })
 const emit = defineEmits(['close'])
 
@@ -235,18 +236,24 @@ function recalcStudentStats() {
   })
 }
 
+function dateToIso(dateStr) {
+  const [day, month] = dateStr.split('/')
+  return `2026-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+}
+
+function isoToDateIdx(isoDate) {
+  const parts = isoDate.split('-')
+  const formatted = `${parseInt(parts[2], 10)}/${parts[1]}`
+  return dates.indexOf(formatted)
+}
+
 // ========== Загрузка студентов из API ==========
 async function loadStudents() {
   const token = localStorage.getItem('token')
   if (!token) return
   
   try {
-    const response = await fetch('http://localhost/api/users/students', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-    const data = await response.json()
-    
-    // Фильтруем студентов по group_id
+    const data = await getStudents()
     const filtered = data.filter(s => s.group_id === props.groupId)
     
     students.value = filtered.map(s => ({
@@ -257,14 +264,43 @@ async function loadStudents() {
       records: dates.map(() => ({ grade: '', present: true }))
     }))
     
-    // Заполняем map для маппинга имён
     filtered.forEach(s => {
       studentsMap.value.set(s.full_name, s.id)
     })
     
+    await loadMarksFromDb()
     recalcStudentStats()
   } catch (err) {
     console.error('Ошибка загрузки студентов', err)
+  }
+}
+
+async function loadMarksFromDb() {
+  if (!props.scheduleId) return
+
+  try {
+    const [grades, attendance] = await Promise.all([
+      getGrades(props.scheduleId),
+      getAttendance(props.scheduleId)
+    ])
+
+    for (const g of grades) {
+      const sIdx = students.value.findIndex(s => s.id === g.student_id)
+      const dIdx = isoToDateIdx(g.grade_date)
+      if (sIdx !== -1 && dIdx !== -1 && g.grade != null) {
+        students.value[sIdx].records[dIdx].grade = g.grade
+      }
+    }
+
+    for (const a of attendance) {
+      const sIdx = students.value.findIndex(s => s.id === a.student_id)
+      const dIdx = isoToDateIdx(a.date)
+      if (sIdx !== -1 && dIdx !== -1) {
+        students.value[sIdx].records[dIdx].present = a.status === 'present' || a.status === 'late'
+      }
+    }
+  } catch (err) {
+    console.error('Ошибка загрузки оценок/посещаемости', err)
   }
 }
 
@@ -402,14 +438,16 @@ async function applyMultiImport() {
     return
   }
 
-  const scheduleId = 1 // TODO: получить реальный schedule_id
+  const scheduleId = props.scheduleId
+  if (!scheduleId) {
+    setImportMsg('Не выбрана пара (schedule_id)', 'error')
+    return
+  }
   let totalSaved = 0
 
   for (const col of csvScoreColumns.value) {
     const targetColIdx = col.targetDateIdx
-    const targetDateStr = dates[targetColIdx]
-    const [day, month] = targetDateStr.split('/')
-    const gradeDate = `2026-${month.padStart(2,'0')}-${day.padStart(2,'0')}`
+    const gradeDate = dateToIso(dates[targetColIdx])
 
     const gradesToSend = []
 
@@ -438,19 +476,11 @@ async function applyMultiImport() {
     if (gradesToSend.length === 0) continue
 
     try {
-      const response = await fetch('http://localhost/api/grades/bulk', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          schedule_id: scheduleId,
-          grade_date: gradeDate,
-          grades: gradesToSend
-        })
+      const result = await bulkSaveGrades({
+        scheduleId,
+        gradeDate,
+        grades: gradesToSend
       })
-      const result = await response.json()
       if (result.status === 'success') {
         totalSaved += gradesToSend.length
         setImportMsg(`✅ ${result.message}`, 'success')
@@ -463,6 +493,7 @@ async function applyMultiImport() {
   }
 
   if (totalSaved > 0) {
+    await loadMarksFromDb()
     recalcStudentStats()
   }
   cancelMultiImport()
@@ -575,11 +606,46 @@ function confirmGrade() {
   students.value[sIdx].records[dIdx].grade = num
   gradeInput.value.visible = false
   recalcStudentStats()
+  persistGrade(sIdx, dIdx, num)
+}
+
+async function persistGrade(sIdx, dIdx, gradeValue) {
+  if (!props.scheduleId) return
+  const student = students.value[sIdx]
+  try {
+    await saveGrade({
+      studentId: student.id,
+      scheduleId: props.scheduleId,
+      grade: Math.round(gradeValue),
+      gradeDate: dateToIso(dates[dIdx])
+    })
+  } catch (err) {
+    console.error('Ошибка сохранения оценки', err)
+    setImportMsg(`❌ ${err.message}`, 'error')
+  }
 }
 
 function togglePresence(sIdx, dIdx) {
   students.value[sIdx].records[dIdx].present = !students.value[sIdx].records[dIdx].present
   recalcStudentStats()
+  persistAttendance(sIdx, dIdx)
+}
+
+async function persistAttendance(sIdx, dIdx) {
+  if (!props.scheduleId) return
+  const student = students.value[sIdx]
+  const present = student.records[dIdx].present
+  try {
+    await saveAttendance({
+      studentId: student.id,
+      scheduleId: props.scheduleId,
+      status: present ? 'present' : 'absent',
+      date: dateToIso(dates[dIdx])
+    })
+  } catch (err) {
+    console.error('Ошибка сохранения посещаемости', err)
+    setImportMsg(`❌ ${err.message}`, 'error')
+  }
 }
 
 function handleClickOutside(e) {
