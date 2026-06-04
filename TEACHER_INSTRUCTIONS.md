@@ -68,25 +68,3 @@
 ```bash
 docker exec -it university psql -U user -d university_db
 ```
-
-Примеры запросов:
-```sql
--- Показать всех преподавателей
-SELECT u.full_name, t.department FROM teachers t JOIN users u ON t.user_id = u.id;
-
--- Показать расписание преподавателя Дербенцева
-SELECT g.name, s.name, r.number, sch.weekday, sch.lesson_number 
-FROM schedule sch
-JOIN groups g ON sch.group_id = g.id
-JOIN subjects s ON sch.subject_id = s.id
-JOIN teachers t ON sch.teacher_id = t.id
-JOIN users u ON t.user_id = u.id
-LEFT JOIN rooms r ON sch.room_id = r.id
-WHERE u.email = 'derbentcev.no@dvfu.ru';
-
--- Показать студентов группы Б9124-09.03.03ру
-SELECT u.full_name FROM students s 
-JOIN users u ON s.user_id = u.id 
-JOIN groups g ON s.group_id = g.id
-WHERE g.name = 'Б9124-09.03.03ру';
-```

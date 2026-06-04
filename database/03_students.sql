@@ -130,9 +130,7 @@ WHERE u.email LIKE '%3@student.ru'
   AND NOT EXISTS (SELECT 1 FROM students s WHERE s.user_id = u.id)
 ON CONFLICT (user_id) DO NOTHING;
 
--- ============================================
 -- Преподаватель
--- ============================================
 INSERT INTO users (email, password_hash, full_name, phone) VALUES
 ('teacher@example.com', '$2b$12$wXp11PgvF2xiwaw0BkqdOuXd/Q2fahznvMJhd88L9xLvKY3U3XK56', 'Учитель Учителевич', '+7-999-888-7766')
 ON CONFLICT (email) DO NOTHING;
@@ -149,9 +147,7 @@ SELECT id, 'Информатики', 'Доцент', 'к.ф.-м.н.'
 FROM users WHERE email = 'teacher@example.com'
 ON CONFLICT (user_id) DO NOTHING;
 
--- ============================================
 -- Расписание для всех групп (3 предмета, неделя 2 семестр 2026)
--- ============================================
 
 -- Вставляем расписание для группы Б9124-09.03.03ру (ПН, СР, ПТ)
 INSERT INTO schedule (group_id, subject_id, teacher_id, room_id, weekday, lesson_number, semester, year)
@@ -229,4 +225,14 @@ WHERE g.name = 'Б9125-02.03.01мо'
   AND t.user_id = (SELECT id FROM users WHERE email = 'teacher@example.com')
   AND r.number = '101'
 ON CONFLICT DO NOTHING;
+
+
+
+
+
+
+
+
+
+
 
