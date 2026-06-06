@@ -38,7 +38,7 @@ def load_categories(db: Session, schedule_id: int) -> list[WeightedCategory]:
         .all()
     )
     return [
-        WeightedCategory(r.id, float(r.weight), float(r.max_points))
+        WeightedCategory(r.id, float(r.weight))
         for r in rows
     ]
 

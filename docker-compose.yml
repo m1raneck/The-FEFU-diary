@@ -17,6 +17,8 @@ services:
       - ./database/02_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
       - ./database/03_students.sql:/docker-entrypoint-initdb.d/03_students.sql
       - ./database/04_grade_scaling.sql:/docker-entrypoint-initdb.d/04_grade_scaling.sql
+      - ./database/08_drop_category_max_points.sql:/docker-entrypoint-initdb.d/08_drop_category_max_points.sql
+      - ./database/09_grade_column_settings.sql:/docker-entrypoint-initdb.d/09_grade_column_settings.sql
     ports:
       - "5432:5432"
     restart: always

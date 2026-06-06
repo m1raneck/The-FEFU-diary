@@ -75,7 +75,6 @@ class GradeCategoryBase(BaseModel):
     code: str = Field(..., max_length=20, examples=["DZ", "KR"])
     name: str = Field(..., max_length=100, examples=["Домашняя работа"])
     weight: float = Field(..., gt=0, examples=[0.3])
-    max_points: float = Field(100, gt=0, examples=[10])
 
 
 class GradeCategorySetRequest(BaseModel):
@@ -91,7 +90,6 @@ class GradeCategoryUpdate(BaseModel):
     code: Optional[str] = None
     name: Optional[str] = None
     weight: Optional[float] = Field(None, gt=0)
-    max_points: Optional[float] = Field(None, gt=0)
 
 
 class GradeCategoryResponse(GradeCategoryBase):
@@ -114,6 +112,24 @@ class GradeScaleSetRequest(BaseModel):
 
 
 class GradeScaleRuleResponse(GradeScaleRuleBase):
+    id: int
+    schedule_id: int
+
+    class Config:
+        from_attributes = True
+
+
+class GradeColumnSettingBase(BaseModel):
+    grade_date: date
+    column_type: str = Field(..., max_length=10, examples=["ДЗ"])
+
+
+class GradeColumnSetRequest(BaseModel):
+    schedule_id: int
+    columns: List[GradeColumnSettingBase]
+
+
+class GradeColumnSettingResponse(GradeColumnSettingBase):
     id: int
     schedule_id: int
 

@@ -13,7 +13,6 @@ class ScaleRule:
 class WeightedCategory:
     id: int
     weight: float
-    max_points: float
 
 
 @dataclass(frozen=True)
@@ -41,23 +40,19 @@ def calculate_weighted_percent(
     entries: Sequence[ScoreEntry],
     categories: Sequence[WeightedCategory],
 ) -> Optional[float]:
+    """Итоговый % = сумма (балл × коэф) по каждой работе."""
     cat_map = {c.id: c for c in categories}
-    weighted_sum = 0.0
-    total_weight = 0.0
+    percents: list[float] = []
 
     for entry in entries:
         category = cat_map.get(entry.category_id)
         if category is None or entry.raw_score is None:
             continue
-        if category.max_points <= 0:
-            continue
-        percent = (float(entry.raw_score) / float(category.max_points)) * 100.0
-        weighted_sum += percent * float(category.weight)
-        total_weight += float(category.weight)
+        percents.append(float(entry.raw_score) * float(category.weight))
 
-    if total_weight == 0:
+    if not percents:
         return None
-    return weighted_sum / total_weight
+    return sum(percents)
 
 
 def calculate_final_grade(

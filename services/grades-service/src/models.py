@@ -26,7 +26,6 @@ class GradeCategory(Base):
     code = Column(String(20), nullable=False)
     name = Column(String(100), nullable=False)
     weight = Column(Numeric(6, 4), nullable=False)
-    max_points = Column(Numeric(10, 2), nullable=False, default=100)
 
 
 class GradeScaleRule(Base):
@@ -36,6 +35,14 @@ class GradeScaleRule(Base):
     min_points = Column(Numeric(10, 2), nullable=False)
     max_points = Column(Numeric(10, 2), nullable=False)
     final_grade = Column(Integer, nullable=False)
+
+
+class GradeColumnSetting(Base):
+    __tablename__ = "grade_column_settings"
+    id = Column(Integer, primary_key=True, index=True)
+    schedule_id = Column(Integer, ForeignKey("schedule.id", ondelete="CASCADE"), nullable=False)
+    grade_date = Column(Date, nullable=False)
+    column_type = Column(String(10), nullable=False)
 
 
 class Grade(Base):

@@ -53,7 +53,49 @@ def set_categories(
             code=cat.code,
             name=cat.name,
             weight=cat.weight,
-            max_points=cat.max_points,
+        )
+        db.add(row)
+        created.append(row)
+
+    db.commit()
+    for row in created:
+        db.refresh(row)
+    return created
+
+
+# ---------- Column types (ДЗ / КР / ДОП per date) ----------
+
+
+@app.get("/api/grades/columns", response_model=List[schemas.GradeColumnSettingResponse])
+def list_column_settings(
+    schedule_id: int,
+    db: Session = Depends(database.get_db),
+    _: models.User = Depends(get_current_user),
+):
+    return (
+        db.query(models.GradeColumnSetting)
+        .filter(models.GradeColumnSetting.schedule_id == schedule_id)
+        .order_by(models.GradeColumnSetting.grade_date)
+        .all()
+    )
+
+
+@app.put("/api/grades/columns", response_model=List[schemas.GradeColumnSettingResponse])
+def set_column_settings(
+    payload: schemas.GradeColumnSetRequest,
+    db: Session = Depends(database.get_db),
+    _: models.User = Depends(get_teacher_role),
+):
+    db.query(models.GradeColumnSetting).filter(
+        models.GradeColumnSetting.schedule_id == payload.schedule_id
+    ).delete()
+
+    created = []
+    for col in payload.columns:
+        row = models.GradeColumnSetting(
+            schedule_id=payload.schedule_id,
+            grade_date=col.grade_date,
+            column_type=col.column_type,
         )
         db.add(row)
         created.append(row)

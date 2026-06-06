@@ -68,7 +68,7 @@
           <tr>
             <th class="col-num">№</th>
             <th class="col-name">ФИО</th>
-            <th class="col-stat">Ср.</th>
+            <th class="col-stat">Ср. <span class="avg-hint">(2–5)</span></th>
             <th class="col-stat">П.</th>
             <th v-for="(date, dIdx) in dates" :key="date" class="date-col">
               <div class="date-text">{{ date }}</div>
@@ -91,9 +91,18 @@
             <td v-for="(rec, dIdx) in student.records" :key="dIdx" class="combo-cell">
               <div class="combo-inner">
                 <div class="combo-grade" @click.stop="editGrade(sIdx, dIdx)">
-                  <span class="grade-val" :class="getGradeClass(rec.grade, dIdx)">
-                    {{ rec.grade === '' ? '—' : rec.grade }}
-                  </span>
+                  <template v-for="disp in [gradeDisplayParts(rec.grade, dIdx)]" :key="dIdx + '-g'">
+                    <span class="grade-val" :class="getGradeClass(rec.grade, dIdx)">
+                      <template v-if="rec.grade === ''">—</template>
+                      <template v-else-if="rec.grade === '+' || rec.grade === '-'">{{ rec.grade }}</template>
+                      <template v-else-if="disp.showPercent">
+                        <span class="grade-raw">{{ disp.raw }}</span>
+                        <span class="grade-arrow">→</span>
+                        <span class="grade-pct">{{ disp.pct }}%</span>
+                      </template>
+                      <template v-else>{{ disp.raw ?? rec.grade }}</template>
+                    </span>
+                  </template>
                 </div>
                 <div class="combo-presence" 
                      :class="rec.present ? 'pres-yes' : 'pres-no'"
@@ -112,7 +121,7 @@
       <span class="legend-item"><span class="leg-dot pres-dot"></span>Присутствовал</span>
       <span class="legend-item"><span class="leg-dot abs-dot"></span>Отсутствовал</span>
       <span class="legend-sep">|</span>
-      <span class="legend-item">Левая часть — оценка, правая — посещение</span>
+      <span class="legend-item">Левая часть — балл → % (× коэф), правая — посещение</span>
     </div>
 
     <!-- Popup для выбора типа колонки -->
@@ -121,10 +130,10 @@
         <div v-if="popup.visible" class="type-popup" :style="{ top: popup.y+'px', left: popup.x+'px' }">
           <div class="popup-label">Тип колонки</div>
           <div class="popup-grid">
-            <button class="popup-btn kr" @click="setType('КР', 5)">КР</button>
-            <button class="popup-btn dop" @click="setType('ДОП', null)">ДОП</button>
-            <button class="popup-btn dz" @click="setType('ДЗ', 100)">ДЗ</button>
-            <button class="popup-btn dash" @click="setType('±', 0)">±</button>
+            <button class="popup-btn kr" @click="setType('КР')">КР</button>
+            <button class="popup-btn dop" @click="setType('ДОП')">ДОП</button>
+            <button class="popup-btn dz" @click="setType('ДЗ')">ДЗ</button>
+            <button class="popup-btn dash" @click="setType('±')">±</button>
           </div>
         </div>
       </Transition>
@@ -160,8 +169,7 @@
             <div class="scale-section-title">Весовые коэффициенты</div>
             <div v-for="cat in categoryWeights" :key="cat.code" class="scale-row">
               <span class="grade-label">{{ cat.name }}:</span>
-              вес <input type="number" v-model.number="cat.weight" step="0.05" min="0.01" max="1" class="scale-input" />
-              макс. <input type="number" v-model.number="cat.max_points" step="1" min="1" class="scale-input" />
+              вес <input type="number" v-model.number="cat.weight" step="0.1" min="0.01" class="scale-input" />
             </div>
           </div>
           <div class="scale-actions">
@@ -177,9 +185,9 @@
         <div v-if="gradeInput.visible" class="grade-overlay" @click.self="gradeInput.visible = false">
           <div class="grade-popup">
             <div class="grade-popup-name">{{ gradeInput.studentName }}</div>
-            <div class="grade-popup-sub">{{ gradeInput.typeName }} · максимум {{ gradeInput.max }}</div>
+            <div class="grade-popup-sub">{{ gradeInput.typeName }}</div>
             <input ref="gradeInputRef" v-model="gradeInput.value" class="grade-field"
-                   type="number" :min="0" :max="gradeInput.max" :placeholder="`0–${gradeInput.max}`"
+                   type="number" min="0" placeholder="Баллы"
                    @keyup.enter="confirmGrade" @keyup.esc="gradeInput.visible=false" />
             <div class="grade-actions">
               <button class="btn-cancel" @click="gradeInput.visible=false">Отмена</button>
@@ -194,7 +202,7 @@
 
 <script setup>
 import { ref, nextTick, onMounted, onBeforeUnmount, computed, watch } from 'vue'
-import { getStudents, getGrades, getAttendance, saveGrade, saveAttendance, bulkSaveGrades, getGradeScale, saveGradeScale, getGradeCategories, saveGradeCategories } from '@/services/marks'
+import { getStudents, getGrades, getAttendance, saveGrade, saveAttendance, bulkSaveGrades, getGradeScale, saveGradeScale, getGradeCategories, saveGradeCategories, getGradeColumns, saveGradeColumns } from '@/services/marks'
 
 const props = defineProps({ 
   subjectName: { type: String, default: 'Базы данных' },
@@ -205,7 +213,7 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const dates = ['21/04', '28/04', '5/05', '12/05', '19/05']
-const columnSettings = ref(dates.map(() => ({ type: null, max: 5, useScale: false, categoryCode: null })))
+const columnSettings = ref(dates.map(() => ({ type: null, categoryCode: null })))
 const students = ref([])
 const studentsMap = ref(new Map())
 
@@ -217,12 +225,27 @@ const gradeScale = ref({
 })
 
 const categoryWeights = ref([
-  { code: 'DZ', name: 'ДЗ', weight: 0.3, max_points: 100 },
-  { code: 'KR', name: 'КР', weight: 0.5, max_points: 5 },
-  { code: 'DOP', name: 'ДОП', weight: 0.2, max_points: 10 },
+  { code: 'DZ', name: 'ДЗ', weight: 0.3 },
+  { code: 'KR', name: 'КР', weight: 0.5 },
+  { code: 'DOP', name: 'ДОП', weight: 0.2 },
 ])
 
+function categoriesToPayload() {
+  return categoryWeights.value.map(c => ({
+    code: c.code,
+    name: c.name,
+    weight: Number(c.weight),
+  }))
+}
+
 const TYPE_TO_CATEGORY = { 'ДЗ': 'DZ', 'КР': 'KR', 'ДОП': 'DOP' }
+const CATEGORY_TO_TYPE = { DZ: 'ДЗ', KR: 'КР', DOP: 'ДОП' }
+
+function getCategoryWeight(categoryCode) {
+  if (!categoryCode) return 1
+  const cat = categoryWeights.value.find(c => c.code === categoryCode)
+  return cat ? Number(cat.weight) : 1
+}
 
 function rulesToLocalScale(rules) {
   const scale = { from2: 0, to2: 40, from3: 41, to3: 60, from4: 61, to4: 80, from5: 81, to5: 100 }
@@ -258,7 +281,6 @@ async function loadScaleAndCategories() {
         code: c.code,
         name: c.name,
         weight: Number(c.weight),
-        max_points: Number(c.max_points),
       }))
     }
   } catch (err) {
@@ -276,22 +298,55 @@ function convertScoreToGrade(score) {
   return null
 }
 
+function parseCellScore(value) {
+  if (value === '' || value === '+' || value === '-') return null
+  const raw = String(value).split('→')[0].trim()
+  const n = parseFloat(raw)
+  return isNaN(n) ? null : n
+}
+
+function scoreToPercent(raw, categoryCode) {
+  return raw * getCategoryWeight(categoryCode)
+}
+
+function formatPct(pct) {
+  return Number.isInteger(pct) ? pct : Math.round(pct * 10) / 10
+}
+
+function gradeDisplayParts(value, dIdx) {
+  const cfg = columnSettings.value[dIdx]
+  const n = parseCellScore(value)
+  if (n == null || !cfg?.categoryCode || cfg.type === '±') {
+    return { showPercent: false, raw: n, pct: null }
+  }
+  return { showPercent: true, raw: n, pct: formatPct(scoreToPercent(n, cfg.categoryCode)) }
+}
+
 function recalcStudentStats() {
   students.value.forEach(student => {
-    let totalPercent = 0, graded = 0, presentCount = 0
+    let totalPercent = 0
+    let hasGrades = false
+    let presentCount = 0
+
     student.records.forEach((rec, idx) => {
       const cfg = columnSettings.value[idx]
-      if (cfg && cfg.max && rec.grade !== '' && rec.grade !== '+' && rec.grade !== '-') {
-        const g = parseFloat(rec.grade)
-        if (!isNaN(g)) { 
-          totalPercent += (g / cfg.max) * 100
-          graded++
-        }
+      const g = parseCellScore(rec.grade)
+      if (g != null && cfg?.type && cfg.type !== '±') {
+        totalPercent += scoreToPercent(g, cfg.categoryCode)
+        hasGrades = true
       }
       if (rec.present) presentCount++
     })
-    student.avg = graded ? Math.round(totalPercent / graded) : 0
+
     student.attendance = Math.round((presentCount / dates.length) * 100)
+
+    if (hasGrades) {
+      const totalPct = Math.min(totalPercent, 100)
+      const grade = convertScoreToGrade(totalPct)
+      student.avg = grade ?? '—'
+    } else {
+      student.avg = '—'
+    }
   })
 }
 
@@ -301,7 +356,8 @@ function dateToIso(dateStr) {
 }
 
 function isoToDateIdx(isoDate) {
-  const parts = isoDate.split('-')
+  const dateOnly = String(isoDate).slice(0, 10)
+  const parts = dateOnly.split('-')
   const formatted = `${parseInt(parts[2], 10)}/${parts[1]}`
   return dates.indexOf(formatted)
 }
@@ -327,10 +383,62 @@ async function loadStudents() {
       studentsMap.value.set(s.full_name, s.id)
     })
     
+    await loadScaleAndCategories()
+    await loadColumnSettings()
     await loadMarksFromDb()
     recalcStudentStats()
   } catch (err) {
     console.error('Ошибка загрузки студентов', err)
+  }
+}
+
+async function loadColumnSettings() {
+  if (!props.scheduleId) return
+  try {
+    const cols = await getGradeColumns(props.scheduleId)
+    for (const col of cols) {
+      const dIdx = isoToDateIdx(col.grade_date)
+      if (dIdx !== -1) {
+        columnSettings.value[dIdx] = {
+          type: col.column_type,
+          categoryCode: TYPE_TO_CATEGORY[col.column_type] || null,
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Типы колонок не загружены', err)
+  }
+}
+
+function inferColumnsFromGrades(grades) {
+  let inferred = false
+  const byDate = {}
+  for (const g of grades) {
+    if (!g.category_id || byDate[g.grade_date]) continue
+    const cat = categoryWeights.value.find(c => c.id === g.category_id)
+    if (cat) byDate[g.grade_date] = cat.code
+  }
+  for (const [isoDate, code] of Object.entries(byDate)) {
+    const dIdx = isoToDateIdx(isoDate)
+    if (dIdx === -1 || columnSettings.value[dIdx].type) continue
+    const type = CATEGORY_TO_TYPE[code]
+    if (type) {
+      columnSettings.value[dIdx] = { type, categoryCode: code }
+      inferred = true
+    }
+  }
+  return inferred
+}
+
+async function persistColumnSettings() {
+  if (!props.scheduleId) return
+  const columns = columnSettings.value
+    .map((cfg, idx) => (cfg.type ? { grade_date: dateToIso(dates[idx]), column_type: cfg.type } : null))
+    .filter(Boolean)
+  try {
+    await saveGradeColumns(props.scheduleId, columns)
+  } catch (err) {
+    console.error('Ошибка сохранения типов колонок', err)
   }
 }
 
@@ -342,6 +450,10 @@ async function loadMarksFromDb() {
       getGrades(props.scheduleId),
       getAttendance(props.scheduleId)
     ])
+
+    if (inferColumnsFromGrades(grades)) {
+      await persistColumnSettings()
+    }
 
     for (const g of grades) {
       const sIdx = students.value.findIndex(s => s.id === g.student_id)
@@ -591,32 +703,38 @@ async function saveScaleSettings() {
   try {
     await Promise.all([
       saveGradeScale(props.scheduleId, localScaleToRules()),
-      saveGradeCategories(props.scheduleId, categoryWeights.value),
+      saveGradeCategories(props.scheduleId, categoriesToPayload()),
     ])
     setImportMsg('✅ Шкала и веса сохранены', 'success')
+    recalcStudentStats()
     await loadScaleAndCategories()
+    recalcStudentStats()
   } catch (err) {
     setImportMsg(`❌ ${err.message}`, 'error')
   }
 }
 
 const popup = ref({ visible: false, x: 0, y: 0, dIndex: null })
-const gradeInput = ref({ visible: false, sIdx: null, dIdx: null, value: '', max: 5, typeName: '', studentName: '' })
+const gradeInput = ref({ visible: false, sIdx: null, dIdx: null, value: '', typeName: '', studentName: '' })
 const gradeInputRef = ref(null)
 
 function getAvgClass(avg) {
-  if (avg >= 70) return 'avg-good'
-  if (avg >= 40) return 'avg-mid'
+  if (avg === '—' || avg === '' || avg == null) return ''
+  const n = Number(avg)
+  if (n >= 4) return 'avg-good'
+  if (n >= 3) return 'avg-mid'
   return 'avg-bad'
 }
 
 function getGradeClass(grade, dIdx) {
   if (grade === '' || grade === '+' || grade === '-') return 'grade-empty'
+  const n = parseCellScore(grade)
+  if (n == null) return ''
   const cfg = columnSettings.value[dIdx]
-  if (!cfg.max) return ''
-  const ratio = grade / cfg.max
-  if (ratio >= 0.8) return 'g-good'
-  if (ratio <= 0.5) return 'g-low'
+  const pct = cfg?.categoryCode ? scoreToPercent(n, cfg.categoryCode) : n
+  const converted = convertScoreToGrade(pct)
+  if (converted != null && converted >= 4) return 'g-good'
+  if (converted != null && converted <= 2) return 'g-low'
   return ''
 }
 
@@ -632,25 +750,16 @@ function openTypePopup(e, dIdx) {
 
 function closePopup() { popup.value.visible = false }
 
-function setType(type, max) {
+function setType(type) {
   const dIdx = popup.value.dIndex
-  if (type === 'ДОП') {
-    const c = prompt('Максимальный балл для ДОП:')
-    if (!c || isNaN(+c) || +c <= 0) {
-      alert('Нужно положительное число')
-      return
-    }
-    max = +c
-  }
   students.value.forEach(s => { s.records[dIdx].grade = type === '±' ? '+' : '0' })
   columnSettings.value[dIdx] = {
     type,
-    max,
-    useScale: type !== '±',
     categoryCode: TYPE_TO_CATEGORY[type] || null,
   }
   recalcStudentStats()
   closePopup()
+  persistColumnSettings()
 }
 
 async function editGrade(sIdx, dIdx) {
@@ -668,8 +777,7 @@ async function editGrade(sIdx, dIdx) {
   gradeInput.value = {
     visible: true,
     sIdx, dIdx,
-    value: students.value[sIdx].records[dIdx].grade === '' ? '' : students.value[sIdx].records[dIdx].grade,
-    max: cfg.max,
+    value: students.value[sIdx].records[dIdx].grade === '' ? '' : parseCellScore(students.value[sIdx].records[dIdx].grade) ?? '',
     typeName: cfg.type,
     studentName: students.value[sIdx].name
   }
@@ -679,10 +787,10 @@ async function editGrade(sIdx, dIdx) {
 }
 
 function confirmGrade() {
-  const { sIdx, dIdx, value, max } = gradeInput.value
+  const { sIdx, dIdx, value } = gradeInput.value
   const num = +value
-  if (value === '' || isNaN(num) || num < 0 || num > max) {
-    alert(`Введите число от 0 до ${max}`)
+  if (value === '' || isNaN(num) || num < 0) {
+    alert('Введите положительное число')
     return
   }
   students.value[sIdx].records[dIdx].grade = num
@@ -701,15 +809,10 @@ async function persistGrade(sIdx, dIdx, gradeValue) {
       studentId: student.id,
       scheduleId: props.scheduleId,
       rawScore: gradeValue,
-      autoConvert: cfg.useScale,
-      grade: cfg.useScale ? convertScoreToGrade(gradeValue) : Math.round(gradeValue),
+      autoConvert: false,
       categoryId: category?.id ?? null,
       gradeDate: dateToIso(dates[dIdx]),
     })
-    if (cfg.useScale) {
-      const converted = convertScoreToGrade(gradeValue)
-      if (converted != null) students.value[sIdx].records[dIdx].grade = `${gradeValue}→${converted}`
-    }
   } catch (err) {
     console.error('Ошибка сохранения оценки', err)
     setImportMsg(`❌ ${err.message}`, 'error')
@@ -916,6 +1019,7 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
 .col-name { text-align: left; padding-left: 16px; font-weight: 500; color: #1a2c44; }
 .col-stat { width: 64px; text-align: center; }
 .avg-badge { display: inline-block; padding: 3px 8px; border-radius: 20px; font-weight: 600; }
+.avg-hint { font-size: 10px; font-weight: 400; opacity: 0.75; }
 .avg-good { background: #dff0e6; color: #1f6e43; }
 .avg-mid { background: #feefcf; color: #b76e00; }
 .avg-bad { background: #ecdcdc; color: #b13b3b; }
@@ -945,7 +1049,10 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
 }
 .combo-grade { flex: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .combo-grade:hover { background: #f6fafe; }
-.grade-val { font-weight: 600; font-size: 14px; color: #1a2c44; }
+.grade-val { font-weight: 600; font-size: 13px; color: #1a2c44; display: inline-flex; align-items: center; gap: 2px; flex-wrap: wrap; justify-content: center; line-height: 1.2; }
+.grade-raw { font-weight: 700; }
+.grade-arrow { color: #8da0b5; font-weight: 400; font-size: 11px; }
+.grade-pct { font-size: 11px; font-weight: 600; color: #3d6a8c; }
 .grade-empty { color: #8da0b5; font-weight: 400; }
 .g-good { color: #1f6e43; font-weight: 700; }
 .g-low { color: #b13b3b; font-weight: 700; }

@@ -30,6 +30,14 @@ export async function saveGradeCategories(scheduleId, categories) {
   return apiPut('/api/grades/categories', { schedule_id: scheduleId, categories })
 }
 
+export async function getGradeColumns(scheduleId) {
+  return apiGet(`/api/grades/columns?schedule_id=${scheduleId}`)
+}
+
+export async function saveGradeColumns(scheduleId, columns) {
+  return apiPut('/api/grades/columns', { schedule_id: scheduleId, columns })
+}
+
 export async function convertScore(scheduleId, rawScore) {
   return apiPost('/api/grades/convert', { schedule_id: scheduleId, raw_score: rawScore })
 }
