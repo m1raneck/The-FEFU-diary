@@ -1,13 +1,7 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost'
+import { apiGet, apiPublicPost } from './api'
 
 export async function login(email, password) {
-  const response = await fetch(`${API_URL}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ login: email, password })
-  })
-
-  const data = await response.json()
+  const data = await apiPublicPost('/api/auth/login', { login: email, password })
 
   if (data.status !== 'success') {
     throw new Error(data.message || 'Ошибка авторизации')
@@ -25,16 +19,10 @@ export async function fetchAndStoreProfile() {
 }
 
 export async function getMe() {
-  const token = localStorage.getItem('token')
-  if (!token) throw new Error('Не авторизован')
-
-  const response = await fetch(`${API_URL}/api/users/me`, {
-    headers: { Authorization: `Bearer ${token}` }
-  })
-  if (!response.ok) throw new Error('Не удалось загрузить профиль')
-
-  const data = await response.json()
-  if (data.status !== 'success') throw new Error(data.message || 'Ошибка профиля')
+  const data = await apiGet('/api/users/me')
+  if (data.status !== 'success') {
+    throw new Error(data.message || 'Ошибка профиля')
+  }
   return data.data
 }
 
@@ -61,6 +49,4 @@ export function logout() {
   localStorage.removeItem('user')
 }
 
-export function getToken() {
-  return localStorage.getItem('token')
-}
+export { getToken } from './api'

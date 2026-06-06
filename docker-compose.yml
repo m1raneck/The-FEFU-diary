@@ -30,13 +30,14 @@ services:
 
   auth-service:
     build:
-      context: ./services/auth-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/auth-service/Dockerfile
     container_name: auth_subsystem
     ports:
       - "8000:8000"
-    env_file:
-      - ./services/auth-service/.env.example
+    environment:
+      DATABASE_URL: postgresql://user:password@postgres:5432/university_db
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
     depends_on:
       postgres:
         condition: service_healthy
@@ -45,13 +46,14 @@ services:
 
   attendance-service:
     build:
-      context: ./services/attendance-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/attendance-service/Dockerfile
     container_name: attendance_subsystem
     ports:
       - "8001:8000"
-    env_file:
-      - ./services/attendance-service/.env.example
+    environment:
+      DATABASE_URL: postgresql://user:password@postgres:5432/university_db
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
     depends_on:
       postgres:
         condition: service_healthy
@@ -60,13 +62,14 @@ services:
 
   grades-service:
     build:
-      context: ./services/grades-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/grades-service/Dockerfile
     container_name: grades_subsystem
     ports:
       - "8002:8000"
-    env_file:
-      - ./services/grades-service/.env.example
+    environment:
+      DATABASE_URL: postgresql://user:password@postgres:5432/university_db
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
     depends_on:
       postgres:
         condition: service_healthy
@@ -75,13 +78,14 @@ services:
 
   schedule-service:
     build:
-      context: ./services/schedule-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/schedule-service/Dockerfile
     container_name: schedule_subsystem
     ports:
       - "8003:8000"
-    env_file:
-      - ./services/schedule-service/.env.example
+    environment:
+      DATABASE_URL: postgresql://user:password@postgres:5432/university_db
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
     depends_on:
       postgres:
         condition: service_healthy
