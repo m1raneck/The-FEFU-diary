@@ -12,7 +12,6 @@ security = HTTPBearer()
 
 
 class AuthDependencies:
-    """JWT auth and role-check dependencies bound to a service User model."""
 
     def __init__(self, user_model: Type, get_db: Callable):
         self.user_model = user_model

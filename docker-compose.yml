@@ -7,7 +7,6 @@ networks:
 services:
   postgres:
     image: postgres:15
-    container_name: university
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
@@ -17,6 +16,7 @@ services:
       - ./database/01_init.sql:/docker-entrypoint-initdb.d/01_init.sql
       - ./database/02_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
       - ./database/03_students.sql:/docker-entrypoint-initdb.d/03_students.sql
+      - ./database/04_grade_scaling.sql:/docker-entrypoint-initdb.d/04_grade_scaling.sql
     ports:
       - "5432:5432"
     restart: always
@@ -32,7 +32,6 @@ services:
     build:
       context: .
       dockerfile: ./services/auth-service/Dockerfile
-    container_name: auth_subsystem
     ports:
       - "8000:8000"
     environment:
@@ -48,7 +47,6 @@ services:
     build:
       context: .
       dockerfile: ./services/attendance-service/Dockerfile
-    container_name: attendance_subsystem
     ports:
       - "8001:8000"
     environment:
@@ -64,7 +62,6 @@ services:
     build:
       context: .
       dockerfile: ./services/grades-service/Dockerfile
-    container_name: grades_subsystem
     ports:
       - "8002:8000"
     environment:
@@ -80,7 +77,6 @@ services:
     build:
       context: .
       dockerfile: ./services/schedule-service/Dockerfile
-    container_name: schedule_subsystem
     ports:
       - "8003:8000"
     environment:
@@ -94,7 +90,6 @@ services:
 
   gateway:
     image: nginx:alpine
-    container_name: api_gateway
     ports:
       - "80:80"
     volumes:
@@ -109,7 +104,6 @@ services:
 
   frontend:
     build: ./frontend
-    container_name: diary_frontend
     ports:
       - "8080:80"
     depends_on:

@@ -13,9 +13,9 @@
           <input type="file" accept=".csv" @change="handleFileUpload" style="display: none" ref="fileInput" />
         </label>
         <button class="sample-btn" @click="downloadSampleCSV">Пример CSV</button>
+        <button class="scale-settings-btn" @click.stop="openScalePopup($event)">⚙ Шкала и веса</button>
         <button v-if="!importModeActive" class="switch-mode-btn" @click="activateImportMode">➕ Импорт нескольких тестов</button>
         <button v-else class="switch-mode-btn" @click="cancelMultiImport">✕ Отменить импорт</button>
-        <button v-if="importModeActive" class="scale-settings-btn" @click.stop="openScalePopup">⚙ Настроить шкалу</button>
       </div>
 
       <div v-if="importModeActive" class="multi-import-container">
@@ -136,6 +136,7 @@
         <div v-if="scalePopup.visible" class="type-popup scale-popup" :style="{ top: scalePopup.y+'px', left: scalePopup.x+'px' }" @click.stop>
           <div class="popup-label">Настройка шкалы</div>
           <div class="scale-inputs">
+            <div class="scale-section-title">Шкала баллов → оценка (2–5)</div>
             <div class="scale-row">
               <span class="grade-label">Оценка 2:</span>
               от <input type="number" v-model.number="gradeScale.from2" step="1" class="scale-input" />
@@ -155,6 +156,12 @@
               <span class="grade-label">Оценка 5:</span>
               от <input type="number" v-model.number="gradeScale.from5" step="1" class="scale-input" />
               до <input type="number" v-model.number="gradeScale.to5" step="1" class="scale-input" />
+            </div>
+            <div class="scale-section-title">Весовые коэффициенты</div>
+            <div v-for="cat in categoryWeights" :key="cat.code" class="scale-row">
+              <span class="grade-label">{{ cat.name }}:</span>
+              вес <input type="number" v-model.number="cat.weight" step="0.05" min="0.01" max="1" class="scale-input" />
+              макс. <input type="number" v-model.number="cat.max_points" step="1" min="1" class="scale-input" />
             </div>
           </div>
           <div class="scale-actions">
@@ -187,7 +194,7 @@
 
 <script setup>
 import { ref, nextTick, onMounted, onBeforeUnmount, computed, watch } from 'vue'
-import { getStudents, getGrades, getAttendance, saveGrade, saveAttendance, bulkSaveGrades } from '@/services/marks'
+import { getStudents, getGrades, getAttendance, saveGrade, saveAttendance, bulkSaveGrades, getGradeScale, saveGradeScale, getGradeCategories, saveGradeCategories } from '@/services/marks'
 
 const props = defineProps({ 
   subjectName: { type: String, default: 'Базы данных' },
@@ -198,9 +205,9 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const dates = ['21/04', '28/04', '5/05', '12/05', '19/05']
-const columnSettings = ref(dates.map(() => ({ type: null, max: 5 })))
+const columnSettings = ref(dates.map(() => ({ type: null, max: 5, useScale: false, categoryCode: null })))
 const students = ref([])
-const studentsMap = ref(new Map()) // name -> student_id
+const studentsMap = ref(new Map())
 
 const gradeScale = ref({
   from2: 0, to2: 40,
@@ -209,11 +216,63 @@ const gradeScale = ref({
   from5: 81, to5: 100
 })
 
-function convertPercentToGrade(percent) {
-  if (percent >= gradeScale.value.from2 && percent <= gradeScale.value.to2) return 2
-  if (percent >= gradeScale.value.from3 && percent <= gradeScale.value.to3) return 3
-  if (percent >= gradeScale.value.from4 && percent <= gradeScale.value.to4) return 4
-  if (percent >= gradeScale.value.from5 && percent <= gradeScale.value.to5) return 5
+const categoryWeights = ref([
+  { code: 'DZ', name: 'ДЗ', weight: 0.3, max_points: 100 },
+  { code: 'KR', name: 'КР', weight: 0.5, max_points: 5 },
+  { code: 'DOP', name: 'ДОП', weight: 0.2, max_points: 10 },
+])
+
+const TYPE_TO_CATEGORY = { 'ДЗ': 'DZ', 'КР': 'KR', 'ДОП': 'DOP' }
+
+function rulesToLocalScale(rules) {
+  const scale = { from2: 0, to2: 40, from3: 41, to3: 60, from4: 61, to4: 80, from5: 81, to5: 100 }
+  for (const r of rules) {
+    if (r.final_grade === 2) { scale.from2 = r.min_points; scale.to2 = r.max_points }
+    if (r.final_grade === 3) { scale.from3 = r.min_points; scale.to3 = r.max_points }
+    if (r.final_grade === 4) { scale.from4 = r.min_points; scale.to4 = r.max_points }
+    if (r.final_grade === 5) { scale.from5 = r.min_points; scale.to5 = r.max_points }
+  }
+  return scale
+}
+
+function localScaleToRules() {
+  return [
+    { min_points: gradeScale.value.from2, max_points: gradeScale.value.to2, final_grade: 2 },
+    { min_points: gradeScale.value.from3, max_points: gradeScale.value.to3, final_grade: 3 },
+    { min_points: gradeScale.value.from4, max_points: gradeScale.value.to4, final_grade: 4 },
+    { min_points: gradeScale.value.from5, max_points: gradeScale.value.to5, final_grade: 5 },
+  ]
+}
+
+async function loadScaleAndCategories() {
+  if (!props.scheduleId) return
+  try {
+    const [rules, categories] = await Promise.all([
+      getGradeScale(props.scheduleId),
+      getGradeCategories(props.scheduleId),
+    ])
+    if (rules?.length) gradeScale.value = rulesToLocalScale(rules)
+    if (categories?.length) {
+      categoryWeights.value = categories.map(c => ({
+        id: c.id,
+        code: c.code,
+        name: c.name,
+        weight: Number(c.weight),
+        max_points: Number(c.max_points),
+      }))
+    }
+  } catch (err) {
+    console.warn('Шкала/веса не загружены, используются значения по умолчанию', err)
+  }
+}
+
+function convertScoreToGrade(score) {
+  const s = Number(score)
+  if (isNaN(s)) return null
+  if (s >= gradeScale.value.from2 && s <= gradeScale.value.to2) return 2
+  if (s >= gradeScale.value.from3 && s <= gradeScale.value.to3) return 3
+  if (s >= gradeScale.value.from4 && s <= gradeScale.value.to4) return 4
+  if (s >= gradeScale.value.from5 && s <= gradeScale.value.to5) return 5
   return null
 }
 
@@ -287,8 +346,9 @@ async function loadMarksFromDb() {
     for (const g of grades) {
       const sIdx = students.value.findIndex(s => s.id === g.student_id)
       const dIdx = isoToDateIdx(g.grade_date)
-      if (sIdx !== -1 && dIdx !== -1 && g.grade != null) {
-        students.value[sIdx].records[dIdx].grade = g.grade
+      if (sIdx !== -1 && dIdx !== -1) {
+        const display = g.raw_score != null ? g.raw_score : g.grade
+        if (display != null) students.value[sIdx].records[dIdx].grade = display
       }
     }
 
@@ -410,7 +470,7 @@ function computeMultiPreview() {
       let percent = col.studentScores[rowIdx]
       let finalGrade
       if (col.useGradeScale) {
-        const grade = convertPercentToGrade(percent)
+        const grade = convertScoreToGrade(percent)
         finalGrade = grade !== null ? grade : percent
       } else {
         finalGrade = percent
@@ -463,12 +523,14 @@ async function applyMultiImport() {
       }
 
       let percent = col.studentScores[rowIdx]
-      let finalGrade = col.useGradeScale ? convertPercentToGrade(percent) : Math.min(percent, 100)
+      let finalGrade = col.useGradeScale ? convertScoreToGrade(percent) : Math.min(percent, 100)
       if (col.useGradeScale && finalGrade === null) finalGrade = percent
 
       gradesToSend.push({
         student_id: studentId,
-        grade: Math.round(finalGrade),
+        raw_score: percent,
+        auto_convert: col.useGradeScale,
+        grade: col.useGradeScale ? convertScoreToGrade(percent) : Math.min(percent, 100),
         comment: ''
       })
     }
@@ -521,6 +583,21 @@ function openScalePopup(event) {
 function closeScalePopup() {
   scalePopup.value.visible = false
   computeMultiPreview()
+  saveScaleSettings()
+}
+
+async function saveScaleSettings() {
+  if (!props.scheduleId) return
+  try {
+    await Promise.all([
+      saveGradeScale(props.scheduleId, localScaleToRules()),
+      saveGradeCategories(props.scheduleId, categoryWeights.value),
+    ])
+    setImportMsg('✅ Шкала и веса сохранены', 'success')
+    await loadScaleAndCategories()
+  } catch (err) {
+    setImportMsg(`❌ ${err.message}`, 'error')
+  }
 }
 
 const popup = ref({ visible: false, x: 0, y: 0, dIndex: null })
@@ -566,7 +643,12 @@ function setType(type, max) {
     max = +c
   }
   students.value.forEach(s => { s.records[dIdx].grade = type === '±' ? '+' : '0' })
-  columnSettings.value[dIdx] = { type, max }
+  columnSettings.value[dIdx] = {
+    type,
+    max,
+    useScale: type !== '±',
+    categoryCode: TYPE_TO_CATEGORY[type] || null,
+  }
   recalcStudentStats()
   closePopup()
 }
@@ -612,13 +694,22 @@ function confirmGrade() {
 async function persistGrade(sIdx, dIdx, gradeValue) {
   if (!props.scheduleId) return
   const student = students.value[sIdx]
+  const cfg = columnSettings.value[dIdx]
+  const category = categoryWeights.value.find(c => c.code === cfg.categoryCode)
   try {
     await saveGrade({
       studentId: student.id,
       scheduleId: props.scheduleId,
-      grade: Math.round(gradeValue),
-      gradeDate: dateToIso(dates[dIdx])
+      rawScore: gradeValue,
+      autoConvert: cfg.useScale,
+      grade: cfg.useScale ? convertScoreToGrade(gradeValue) : Math.round(gradeValue),
+      categoryId: category?.id ?? null,
+      gradeDate: dateToIso(dates[dIdx]),
     })
+    if (cfg.useScale) {
+      const converted = convertScoreToGrade(gradeValue)
+      if (converted != null) students.value[sIdx].records[dIdx].grade = `${gradeValue}→${converted}`
+    }
   } catch (err) {
     console.error('Ошибка сохранения оценки', err)
     setImportMsg(`❌ ${err.message}`, 'error')
@@ -672,6 +763,7 @@ function downloadSampleCSV() {
 
 // ========== Жизненный цикл ==========
 onMounted(() => {
+  loadScaleAndCategories()
   loadStudents()
   document.addEventListener('click', handleClickOutside)
 })
@@ -916,6 +1008,13 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
   background: #8eb2e2;
   color: #1e3a5f;
   width: 100%;
+}
+.scale-section-title {
+  font-weight: 600;
+  margin-top: 8px;
+  margin-bottom: 4px;
+  color: #aec1df;
+  font-size: 13px;
 }
 .scale-inputs {
   display: flex;

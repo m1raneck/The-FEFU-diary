@@ -50,7 +50,6 @@ INSERT INTO teachers (user_id, department, position, degree)
 SELECT id, 'Факультет информатики', 'Доцент', 'к.ф.-м.н.' FROM users WHERE email = 'ivanov@university.ru'
 ON CONFLICT (user_id) DO NOTHING;
 
--- Добавляем преподавателя Дербенцева
 INSERT INTO users (email, password_hash, full_name, phone)
 SELECT 'derbentcev.no@dvfu.ru', '$2b$12$QIpVcjOBDPUYYfHLMjlFduUfj.GNQpBFSWJXD2Y9MjCVUYKYBYHnq', 'Дербенцев Н.О.', '+7-900-100-0001'
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'derbentcev.no@dvfu.ru');
