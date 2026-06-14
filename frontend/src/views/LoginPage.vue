@@ -1,64 +1,61 @@
 <template>
-  <div class="login-page">
-    <div class="background-overlay"></div>
-    
+  <div class="screen">
     <div class="login-card">
-      <div class="avatar"></div>
-      
-      <h1 class="diary-title">Дневник</h1>
-      <div class="divider"></div>
-      <h2 class="login-title">Вход</h2>
-      
-      <form @submit.prevent="handleLogin" class="login-form">
-        <div class="input-group">
-          <input 
-            id="email"
-            v-model="form.email"
-            type="email"
-            placeholder="Почта"
-            :class="{ 'error': errors.email }"
-            @input="clearError('email')"
-          />
-          <span v-if="errors.email" class="error-message">{{ errors.email }}</span>
+      <div class="card-content">
+        <div class="title-section">
+          <div class="icon-wrapper">
+            <img src="@/assets/icon.png" alt="Icon" class="icon" />
+          </div>
+          <div class="logo">
+            <div class="logo-main">UniDiary</div>
+            <div class="logo-sub">ЭЛЕКТРОННЫЙ ДНЕВНИК</div>
+          </div>
+          <div class="line"></div>
         </div>
-        
-        <div class="input-group">
-          <input 
-            id="password"
-            v-model="form.password"
-            type="password"
-            placeholder="Пароль"
-            :class="{ 'error': errors.password }"
-            @input="clearError('password')"
-          />
-          <span v-if="errors.password" class="error-message">{{ errors.password }}</span>
-        </div>
-        
-        <button type="submit" class="login-button">Войти</button>
-        
-        <div class="divider-bottom"></div>
-        
-        <a href="#" class="forgot-password" @click.prevent="forgotPassword">Забыли пароль?</a>
-      </form>
+
+        <form @submit.prevent="handleLogin" class="form-section">
+          <div class="input-field">
+            <label class="field-label">Email</label>
+            <input
+              v-model="form.email"
+              type="email"
+              placeholder="example@mail.com"
+              :class="{ 'error': errors.email }"
+              @input="clearError('email')"
+            />
+            <span v-if="errors.email" class="error-message">{{ errors.email }}</span>
+          </div>
+
+          <div class="input-field">
+            <label class="field-label">Password</label>
+            <input
+              v-model="form.password"
+              type="password"
+              placeholder="••••••••"
+              :class="{ 'error': errors.password }"
+              @input="clearError('password')"
+            />
+            <span v-if="errors.password" class="error-message">{{ errors.password }}</span>
+          </div>
+
+          <button type="submit" class="login-button">Войти</button>
+
+          <a href="#" class="forgot-link" @click.prevent="forgotPassword">Забыли пароль?</a>
+        </form>
+      </div>
     </div>
   </div>
 </template>
 
 <script>
-import { login } from "@/services/auth"; // раскомментируй для реального бэкенда
+import { login } from "@/services/auth";
 
 export default {
   name: 'LoginPage',
   data() {
     return {
-      form: {
-        email: '',
-        password: ''
-      },
-      errors: {
-        email: '',
-        password: ''
-      }
+      form: { email: '', password: '' },
+      errors: { email: '', password: '' }
     }
   },
   methods: {
@@ -66,10 +63,8 @@ export default {
       const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
       return re.test(email)
     },
-    
     validateForm() {
       let isValid = true
-      
       if (!this.form.email) {
         this.errors.email = 'Пожалуйста, введите почту'
         isValid = false
@@ -77,7 +72,6 @@ export default {
         this.errors.email = 'Введите корректный email (например, name@domain.com)'
         isValid = false
       }
-      
       if (!this.form.password) {
         this.errors.password = 'Пожалуйста, введите пароль'
         isValid = false
@@ -85,26 +79,22 @@ export default {
         this.errors.password = 'Пароль должен содержать минимум 4 символа'
         isValid = false
       }
-      
       return isValid
     },
-    
     clearError(field) {
       this.errors[field] = ''
     },
-    
     async handleLogin() {
       if (!this.validateForm()) return
-  try {
-    await login(this.form.email, this.form.password)
-    this.$router.push('/schedule')
-  } catch (e) {
-    this.errors.password = e.message || 'Ошибка входа'
-  }
+      try {
+        await login(this.form.email, this.form.password)
+        this.$router.push('/schedule')
+      } catch (err) {
+        this.errors.password = err.message || 'Ошибка входа. Проверьте email и пароль.'
+      }
     },
-    
     forgotPassword() {
-        this.$router.push('/forgot-password')
+      this.$router.push('/forgot-password')
     }
   }
 }
@@ -117,229 +107,213 @@ export default {
   box-sizing: border-box;
 }
 
-.login-page {
+.screen {
   min-height: 100vh;
   width: 100%;
-  background: linear-gradient(63deg, rgba(15, 80, 110, 0.2) 17%, rgba(153, 191, 230, 0.2) 65%),
-              linear-gradient(0deg, #465C73 0%, #465C73 100%);
+  background-image: url('@/assets/image.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: #919ba4;
+  background-blend-mode: overlay;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
-  position: relative;
+  padding: 2rem;
 }
 
 .login-card {
-  position: relative;
   width: 100%;
-  max-width: 491px;
-  background: linear-gradient(145deg, rgba(193, 200, 206, 0.9) 31%, 
-              rgba(183, 192, 200, 0.9) 47%, 
-              rgba(139, 153, 171, 0.9) 100%);
-  border: 2px solid rgba(255, 255, 255, 0.78);
-  border-radius: 30px;
-  box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
-  padding: 2rem 2rem 3rem;
+  max-width: 560px;
+  backdrop-filter: blur(6px) brightness(110%);
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.55) 22%,
+    rgba(188, 207, 226, 0.35) 79%,
+    rgba(149, 169, 195, 0.55) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 38px;
+  box-shadow: 0px 12px 28px rgba(0, 0, 0, 0.25);
+  padding: 3rem 3rem 3.2rem;
 }
 
-.avatar {
-  width: 52px;
-  height: 52px;
-  background-color: #667593;
-  border-radius: 50%;
-  box-shadow: inset 0px 4px 4px rgba(0, 0, 0, 0.25);
-  position: absolute;
-  margin-top: 1.2rem;
-  left: 6rem;
+.card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
 }
 
-.diary-title {
-  font-family: system-ui, 'Inter', -apple-system, sans-serif;
+.title-section {
+  text-align: center;
+  margin-bottom: 0.25rem;
+}
+
+.icon-wrapper {
+  text-align: center;
+  margin-bottom: 12px;
+}
+.icon {
+  width: 80px;
+  height: auto;
+  object-fit: contain;
+}
+
+.logo {
+  margin-bottom: 16px;
+}
+.logo-main {
+  color: #2c3e4f;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 46px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+.logo-sub {
+  color: #4a5a7a;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 13px;
   font-weight: 500;
-  font-size: clamp(24px, 5vw, 32px);
-  color: #38445E;
-  text-align: center;
-  margin-top: 1.5rem;
-  margin-bottom: 1rem;
+  letter-spacing: 1.5px;
+  margin-top: 6px;
+  text-transform: uppercase;
 }
 
-.divider {
-  height: 1px;
-  background: linear-gradient(to right, transparent, #899bbf, transparent);
-  width: 100%;
-  margin-bottom: 1rem;
-  margin-top: 0.5rem;
-  opacity: 0.5;
+.line {
+  height: 2px;
+  background: #566697;
+  width: 60%;
+  margin: 0 auto;
+  opacity: 0.4;
 }
 
-.login-title {
-  font-family: system-ui, 'Inter', -apple-system, sans-serif;
-  font-weight: 350;
-  font-size: clamp(24px, 5vw, 32px);
-  color: #38445E;
-  text-align: center;
-  margin-top: 0.5rem;
-  margin-bottom: 2rem;
-}
-
-.login-form {
+.form-section {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.8rem;
 }
 
-.input-group {
+.input-field {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 10px;
 }
 
-.input-group input {
-  width: 100%;
-  padding: 1rem;
+.field-label {
+  color: #ffffff;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   font-size: 16px;
-  font-family: system-ui, 'Inter', -apple-system, sans-serif;
-  background-color: #e6e6e6;
-  border: 2px solid transparent;
-  border-radius: 10px;
-  transition: all 0.3s ease;
+  font-weight: 600;
+  margin-left: 0.5rem;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.input-field input {
+  background-color: rgba(255, 255, 255, 0.35);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 44px;
+  padding: 16px 24px;
+  font-size: 16px;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: #395d97;
   outline: none;
+  transition: all 0.25s ease;
+  width: 100%;
 }
 
-.input-group input:focus {
-  border-color: #667593;
-  background-color: #fff;
-  box-shadow: 0 0 0 3px rgba(102, 117, 147, 0.2);
+.input-field input::placeholder {
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
 }
 
-.input-group input.error {
-  border-color: #dc3545;
-  background-color: #fff8f8;
+.input-field input:focus {
+  border-color: #6f8bc0;
+  background-color: rgba(255, 255, 255, 0.55);
+}
+
+.input-field input.error {
+  border-color: #806cc4;
+  background-color: rgba(163, 107, 203, 0.2);
+  box-shadow: 0 0 0 3px rgba(242, 194, 214, 0.1);
 }
 
 .error-message {
-  color: #dc3545;
-  font-family: system-ui, 'Inter', -apple-system, sans-serif;
-  font-size: 14px;
-  margin-top: -0.25rem;
+  color: #653897;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 12px;
+  margin-left: 0.75rem;
+  font-weight: 500;
 }
 
 .login-button {
-  background-color: #667593;
-  color: #ffffff;
-  font-family: system-ui, 'Inter', -apple-system, sans-serif;
-  font-weight: 800;
-  font-size: 20px;
-  height: 80px;
+  background-color: #283347;
+  border-radius: 44px;
+  box-shadow: 0px 6px 12px rgba(0, 0, 0, 0.3);
   border: none;
-  border-radius: 10px;
+  color: #f0f5fc;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  padding: 24px 20px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  margin-top: 1rem;
+  transition: all 0.25s ease;
+  width: 100%;
+  margin-top: 2.5rem;
 }
 
 .login-button:hover {
-  background-color: #4a5a73;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  background-color: #1c253b;
+  transform: translateY(-3px);
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.35);
 }
 
-.login-button:active {
-  transform: translateY(0);
-}
-
-.divider-bottom {
-  height: 1px;
-  background: linear-gradient(to right, transparent, #505e7b, transparent);
-  width: 100%;
-  margin: 0.5rem 0;
-  opacity: 0.5;
-}
-
-.forgot-password {
-  font-family: system-ui, 'Inter', -apple-system, sans-serif;
-  font-weight: 400;
-  font-size: 20px;
-  color: #000000;
+.forgot-link {
+  color: #1a1f2c;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 18px;
+  font-weight: 600;
   text-align: center;
   text-decoration: none;
-  transition: all 0.3s ease;
-  display: block;
+  transition: color 0.2s;
+  margin-top: 0.2rem;
+  margin-bottom: 1rem;
+  letter-spacing: 0.3px;
 }
 
-.forgot-password:hover {
-  color: #dc3545;
-  text-decoration: underline;
+.forgot-link:hover {
+  color: #275b97;
 }
 
-
-@media (max-width: 768px) {
+@media (max-width: 640px) {
+  .screen {
+    padding: 1rem;
+  }
   .login-card {
-    padding: 1.5rem;
-    max-width: 90%;
+    max-width: 92%;
+    padding: 2rem 1.5rem 2.5rem;
   }
-  
+  .icon {
+    width: 50px;
+  }
+  .logo-main {
+    font-size: 34px;
+  }
+  .logo-sub {
+    font-size: 10px;
+  }
   .login-button {
-    height: 65px;
-    font-size: 18px;
-    width: 500px;
-    margin-left: 3.5rem;
-    height:70px;
+    font-size: 20px;
+    padding: 14px;
+    margin-top: 2rem;
   }
-  
-  .forgot-password {
-    font-size: 18px;
-    margin-top: -0.5rem;
-
-  }
-  
-  .input-group input {
-    padding: 0.875rem;
-    width: 500px;
-    margin-left: 3.5rem;
-    height:60px;
-  }
-  
-  .avatar {
-    width: 45px;
-    height: 44px;
-    top: 32px;
-    left: 50px;
-  }
-}
-
-@media (max-width: 560px) {
-  .login-card {
-    padding: 1.25rem;
-  }
-  
-  .login-button {
-    height: 55px;
+  .forgot-link {
     font-size: 16px;
   }
-  
-  .forgot-password {
-    font-size: 14px;
+  .card-content {
+    gap: 2rem;
   }
-  
-  .input-group input {
-    padding: 0.75rem;
-  }
-  
-  .avatar {
-    width: 38px;
-    height: 38px;
-    top: 28px;
-    left: 35px;
-  }
-}
-
-@media (max-width: 400px) {
-  .avatar {
-    width: 32px;
-    height: 32px;
-    top: 24px;
-    left: 25px;
+  .form-section {
+    gap: 1.5rem;
   }
 }
 </style>

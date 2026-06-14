@@ -1,47 +1,47 @@
 <template>
-  <div class="student-marks-wrapper">
-    <div class="marks-header">
-      <div class="subject-pill">{{ subjectName }}</div>
-      <button class="close-btn" @click="$emit('close')">✕</button>
-    </div>
+  <div class="modal-overlay" @click.self="$emit('close')">
+    <div class="marks-card">
+      <div class="card-header">
+        <div class="subject-badge">{{ subjectName }}</div>
+        <button class="close-btn" @click="$emit('close')">✕</button>
+      </div>
 
-    <div v-if="loading" class="state-msg">Загрузка...</div>
-    <div v-else-if="error" class="state-msg error">{{ error }}</div>
-    <div v-else-if="dates.length === 0" class="state-msg">Пока нет оценок по этому предмету</div>
+      <div v-if="loading" class="state-message">Загрузка...</div>
+      <div v-else-if="error" class="state-message error">{{ error }}</div>
+      <div v-else-if="rows.length === 0" class="state-message">Нет оценок по этому предмету</div>
 
-    <div v-else class="table-scroll">
-      <table class="marks-table">
-        <thead>
-          <tr>
-            <th>Дата</th>
-            <th>Оценка</th>
-            <th>Посещение</th>
-            <th>Комментарий</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="row in rows" :key="row.date">
-            <td>{{ row.dateLabel }}</td>
-            <td>
-              <span class="grade-val" :class="gradeClass(row.grade)">
-                {{ row.grade ?? '—' }}
-              </span>
-            </td>
-            <td>
-              <span class="presence" :class="row.present ? 'yes' : 'no'">
-                {{ row.present === null ? '—' : (row.present ? '✓' : '✗') }}
-              </span>
-            </td>
-            <td class="comment">{{ row.comment || '—' }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+      <div v-else class="table-container">
+        <table class="marks-table">
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>Оценка</th>
+              <th>Посещение</th>
+              <th>Комментарий</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in rows" :key="row.date">
+              <td class="date-cell">{{ row.dateLabel }}</td>
+              <td class="grade-cell">
+                <span class="grade-value" :class="gradeClass(row.grade)">{{ row.grade ?? '—' }}</span>
+              </td>
+              <td class="attendance-cell">
+                <span class="attendance-icon" :class="row.present === true ? 'present' : (row.present === false ? 'absent' : '')">
+                  {{ row.present === true ? '✓' : (row.present === false ? '✗' : '—') }}
+                </span>
+              </td>
+              <td class="comment-cell">{{ row.comment || '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
-    <div v-if="avg !== null" class="summary">
-      Средний балл: <b>{{ avg }}</b>
-      <span class="sep">|</span>
-      Посещаемость: <b>{{ attendancePct }}%</b>
+      <div v-if="avg !== null" class="card-footer">
+        <span class="stat">Средний балл: <b>{{ avg }}</b></span>
+        <span class="divider">|</span>
+        <span class="stat">Посещаемость: <b>{{ attendancePct }}%</b></span>
+      </div>
     </div>
   </div>
 </template>
@@ -58,7 +58,6 @@ defineEmits(['close'])
 
 const loading = ref(true)
 const error = ref('')
-const dates = ref([])
 const rows = ref([])
 
 const avg = computed(() => {
@@ -74,16 +73,16 @@ const attendancePct = computed(() => {
   return Math.round((present / known.length) * 100)
 })
 
-function formatDate(iso) {
-  const [y, m, d] = iso.split('-')
-  return `${d}.${m}.${y}`
-}
-
 function gradeClass(grade) {
   if (grade == null) return ''
   if (grade >= 80) return 'good'
   if (grade >= 60) return 'mid'
   return 'low'
+}
+
+function formatDate(iso) {
+  const [y, m, d] = iso.split('-')
+  return `${d}.${m}.${y}`
 }
 
 async function load() {
@@ -98,9 +97,9 @@ async function load() {
     const dateSet = new Set()
     grades.forEach(g => dateSet.add(g.grade_date))
     attendance.forEach(a => dateSet.add(a.date))
-    dates.value = [...dateSet].sort()
+    const dates = [...dateSet].sort()
 
-    rows.value = dates.value.map(iso => {
+    rows.value = dates.map(iso => {
       const g = grades.find(x => x.grade_date === iso)
       const a = attendance.find(x => x.date === iso)
       return {
@@ -122,84 +121,207 @@ onMounted(load)
 </script>
 
 <style scoped>
-.student-marks-wrapper {
+.modal-overlay {
+  inset: 0;
+  background-image: url('@/assets/image.png');
+  backdrop-filter: blur(8px);
   display: flex;
-  flex-direction: column;
-  max-height: 80vh;
-  background: #91a6c5;
-  border-radius: 24px;
-  overflow: hidden;
-  font-family: system-ui, 'Inter', sans-serif;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
 }
-.marks-header {
+
+.marks-card {
+  width: 100%;
+  background: linear-gradient(145deg,
+    rgba(255, 255, 255, 0.65) 22%,
+    rgba(188, 207, 226, 0.45) 79%,
+    rgba(149, 169, 195, 0.55) 100%);
+  backdrop-filter: blur(12px) brightness(105%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 30px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 24px;
-  background: #5f7b9f66;
-  border-bottom: 1px solid rgba(66, 107, 157, 0.5);
+  padding: 1.5rem 2rem;
+  background: rgba(227, 240, 255, 0.25);
+  border-bottom: 1px solid rgba(86, 112, 193, 0.3);
 }
-.subject-pill {
-  font-size: 16px;
-  font-weight: 600;
-  color: #1e4a76;
-  background: #9ab0cc;
-  padding: 6px 20px;
-  border-radius: 40px;
+
+.subject-badge {
+  background: rgba(102, 137, 202, 0.8);
+  border-radius: 44px;
+  padding: 10px 28px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #f0f5fc;
+  letter-spacing: -0.3px;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
+
 .close-btn {
-  width: 32px;
-  height: 32px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
-  border: 1px solid #9eaab7;
-  background: transparent;
-  color: #c4cfe0;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  font-size: 24px;
+  font-weight: 600;
+  color: #2c3e4f;
   cursor: pointer;
+  transition: 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.state-msg {
-  padding: 32px;
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.85);
+  transform: scale(1.02);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.state-message {
+  padding: 3rem 2rem;
   text-align: center;
-  color: #1e3a5f;
+  font-size: 18px;
+  font-weight: 500;
+  color: #2c3e4f;
+  background: rgba(255,255,255,0.4);
 }
-.state-msg.error { color: #b13b3b; }
-.table-scroll {
-  overflow: auto;
-  margin: 20px;
-  border-radius: 16px;
-  border: 1px solid #5f7b9f;
-  background: #3c5b84;
+.state-message.error {
+  color: #b13b3b;
 }
+
+.table-container {
+  margin: 1.8rem 2rem;
+  overflow-x: auto;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(2px);
+  border: 0.5px solid rgba(111, 138, 202, 0.9);
+}
+
 .marks-table {
   width: 100%;
   border-collapse: collapse;
+  font-family: 'Inter', system-ui, sans-serif;
   font-size: 14px;
 }
+
 .marks-table th {
-  background: #dae4ed;
-  padding: 12px;
-  color: #17365f;
-  font-weight: 600;
+  background: rgba(206, 225, 255, 0.5);
+  padding: 14px 12px;
+  font-weight: 700;
+  color: #1f4a6e;
+  border-bottom: 1px solid rgba(102, 139, 190, 0.4);
 }
+
 .marks-table td {
   padding: 12px;
   text-align: center;
-  border-bottom: 1px solid #c9d5e4;
-  background: #dbe5ee;
+  border-bottom: 1px solid rgba(116, 149, 197, 0.3);
+  background: rgba(255, 255, 255, 0.6);
   color: #1a2c44;
 }
-.comment { font-size: 12px; color: #4a6f8c; }
-.grade-val { font-weight: 700; }
-.grade-val.good { color: #1f6e43; }
-.grade-val.mid { color: #b76e00; }
-.grade-val.low { color: #b13b3b; }
-.presence.yes { color: #1f9755; font-weight: 700; }
-.presence.no { color: #cc4d4d; font-weight: 700; }
-.summary {
-  padding: 14px 24px;
-  background: #6882a9;
-  color: #243966;
-  font-size: 13px;
-  border-top: 1px solid #4f7098;
+
+.grade-value {
+  font-weight: 700;
+  font-size: 18px;
 }
-.sep { margin: 0 12px; opacity: 0.5; }
+.grade-value.good { color: #1f6e43; }
+.grade-value.mid  { color: #b76e00; }
+.grade-value.low  { color: #b13b3b; }
+
+.attendance-icon {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  line-height: 32px;
+  border-radius: 50%;
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+}
+.attendance-icon.present {
+  background: #5fba8a;
+  color: white;
+}
+.attendance-icon.absent {
+  background: #e58e8e;
+  color: white;
+}
+.attendance-icon:not(.present):not(.absent) {
+  background: rgba(200, 200, 210, 0.6);
+  color: #4a6f8c;
+}
+
+.comment-cell {
+  max-width: 200px;
+  word-break: break-word;
+  font-style: italic;
+  color: #4a6f8c;
+}
+
+.card-footer {
+  padding: 1rem 2rem;
+  background: rgba(227, 240, 255, 0.4);
+  border-top: 1px solid rgba(86, 112, 193, 0.3);
+  text-align: center;
+  font-size: 16px;
+  font-weight: 500;
+  color: #1f4a6e;
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+.stat b {
+  font-weight: 800;
+  color: #283347;
+}
+.divider {
+  opacity: 0.5;
+}
+
+@media (max-width: 640px) {
+  .marks-card {
+    max-width: 95%;
+  }
+  .card-header {
+    padding: 1rem 1.2rem;
+  }
+  .subject-badge {
+    font-size: 16px;
+    padding: 6px 18px;
+  }
+  .close-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+  }
+  .table-container {
+    margin: 1rem;
+  }
+  .marks-table th,
+  .marks-table td {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+  .attendance-icon {
+    width: 26px;
+    height: 26px;
+    line-height: 26px;
+    font-size: 14px;
+  }
+  .card-footer {
+    font-size: 13px;
+    gap: 10px;
+  }
+}
 </style>

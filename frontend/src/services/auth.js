@@ -64,3 +64,20 @@ export function logout() {
 export function getToken() {
   return localStorage.getItem('token')
 }
+
+// ========== ДОБАВЛЕННАЯ ФУНКЦИЯ ДЛЯ ВОССТАНОВЛЕНИЯ ПАРОЛЯ ==========
+export async function requestPasswordReset(email) {
+  const response = await fetch(`${API_URL}/api/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email })
+  })
+
+  const data = await response.json()
+
+  if (data.status !== 'success') {
+    throw new Error(data.message || 'Ошибка отправки ссылки')
+  }
+
+  return data
+}
