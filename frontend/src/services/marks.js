@@ -85,3 +85,22 @@ export async function bulkSaveGrades({ scheduleId, gradeDate, grades }) {
     grades,
   })
 }
+
+export async function getLessonComments(scheduleId) {
+  const query = scheduleId ? `?schedule_id=${scheduleId}` : ''
+  return apiGet(`/api/lesson-comments${query}`)
+}
+
+export function normalizeDate(value) {
+  if (!value) return ''
+  return String(value).slice(0, 10)
+}
+
+export async function saveLessonComment({ studentId, scheduleId, lessonDate, comment }) {
+  return apiPost('/api/lesson-comments', {
+    student_id: studentId,
+    schedule_id: scheduleId,
+    lesson_date: lessonDate,
+    comment,
+  })
+}

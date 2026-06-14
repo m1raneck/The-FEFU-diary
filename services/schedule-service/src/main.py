@@ -1,6 +1,9 @@
 from typing import List, Optional
 
+from datetime import date
+
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session, joinedload
 
 from fefu_common.auth import AuthDependencies
@@ -147,3 +150,79 @@ def create_schedule(
     db.commit()
     db.refresh(new_entry)
     return new_entry
+
+
+@app.get("/api/lesson-comments", response_model=List[schemas.LessonCommentResponse])
+def get_lesson_comments(
+    schedule_id: Optional[int] = None,
+    student_id: Optional[int] = None,
+    lesson_date: Optional[date] = None,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    profiles = auth_deps.get_profile_ids(db, current_user.id)
+
+    if profiles["student_id"]:
+        query = db.query(models.LessonComment).filter(
+            models.LessonComment.student_id == profiles["student_id"]
+        )
+        if schedule_id:
+            query = query.filter(models.LessonComment.schedule_id == schedule_id)
+        if lesson_date:
+            query = query.filter(models.LessonComment.lesson_date == lesson_date)
+        return query.order_by(models.LessonComment.lesson_date).all()
+
+    if profiles["teacher_id"]:
+        query = db.query(models.LessonComment)
+        if student_id:
+            query = query.filter(models.LessonComment.student_id == student_id)
+        if schedule_id:
+            query = query.filter(models.LessonComment.schedule_id == schedule_id)
+        if lesson_date:
+            query = query.filter(models.LessonComment.lesson_date == lesson_date)
+        return query.order_by(models.LessonComment.lesson_date).all()
+
+    raise HTTPException(status_code=403, detail="No role assigned")
+
+
+@app.post("/api/lesson-comments")
+def upsert_lesson_comment(
+    payload: schemas.LessonCommentCreate,
+    db: Session = Depends(database.get_db),
+    _: models.User = Depends(get_teacher_role),
+):
+    lesson_date = payload.lesson_date or date.today()
+    comment_text = (payload.comment or "").strip()
+
+    existing = (
+        db.query(models.LessonComment)
+        .filter(
+            models.LessonComment.student_id == payload.student_id,
+            models.LessonComment.schedule_id == payload.schedule_id,
+            models.LessonComment.lesson_date == lesson_date,
+        )
+        .first()
+    )
+
+    if not comment_text:
+        if existing:
+            db.delete(existing)
+            db.commit()
+        return JSONResponse(status_code=200, content={"status": "deleted"})
+
+    if existing:
+        existing.comment = comment_text
+        db.commit()
+        db.refresh(existing)
+        return existing
+
+    row = models.LessonComment(
+        student_id=payload.student_id,
+        schedule_id=payload.schedule_id,
+        lesson_date=lesson_date,
+        comment=comment_text,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row

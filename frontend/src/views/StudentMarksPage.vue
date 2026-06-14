@@ -7,7 +7,7 @@
 
     <div v-if="loading" class="state-msg">Загрузка...</div>
     <div v-else-if="error" class="state-msg error">{{ error }}</div>
-    <div v-else-if="dates.length === 0" class="state-msg">Пока нет оценок по этому предмету</div>
+    <div v-else-if="dates.length === 0" class="state-msg">Пока нет данных по этому предмету</div>
 
     <div v-else class="table-scroll">
       <table class="marks-table">
@@ -48,7 +48,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { getGrades, getAttendance } from '@/services/marks'
+import { getGrades, getAttendance, getLessonComments, normalizeDate } from '@/services/marks'
 
 const props = defineProps({
   subjectName: { type: String, default: '' },
@@ -90,24 +90,27 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [grades, attendance] = await Promise.all([
+    const [grades, attendance, lessonComments] = await Promise.all([
       getGrades(props.scheduleId),
-      getAttendance(props.scheduleId)
+      getAttendance(props.scheduleId),
+      getLessonComments(props.scheduleId),
     ])
 
     const dateSet = new Set()
-    grades.forEach(g => dateSet.add(g.grade_date))
-    attendance.forEach(a => dateSet.add(a.date))
-    dates.value = [...dateSet].sort()
+    grades.forEach(g => dateSet.add(normalizeDate(g.grade_date)))
+    attendance.forEach(a => dateSet.add(normalizeDate(a.date)))
+    lessonComments.forEach(c => dateSet.add(normalizeDate(c.lesson_date)))
+    dates.value = [...dateSet].filter(Boolean).sort()
 
     rows.value = dates.value.map(iso => {
-      const g = grades.find(x => x.grade_date === iso)
-      const a = attendance.find(x => x.date === iso)
+      const g = grades.find(x => normalizeDate(x.grade_date) === iso)
+      const a = attendance.find(x => normalizeDate(x.date) === iso)
+      const c = lessonComments.find(x => normalizeDate(x.lesson_date) === iso)
       return {
         date: iso,
         dateLabel: formatDate(iso),
         grade: g?.grade ?? null,
-        comment: g?.comment || a?.comment || '',
+        comment: c?.comment || '',
         present: a ? (a.status === 'present' || a.status === 'late') : null
       }
     })

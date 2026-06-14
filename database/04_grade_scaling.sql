@@ -1,4 +1,3 @@
--- Категории оценок с весовыми коэффициентами (ДЗ, КР, тест и т.д.)
 CREATE TABLE IF NOT EXISTS grade_categories (
     id SERIAL PRIMARY KEY,
     schedule_id INTEGER NOT NULL REFERENCES schedule(id) ON DELETE CASCADE,
@@ -8,7 +7,6 @@ CREATE TABLE IF NOT EXISTS grade_categories (
     UNIQUE (schedule_id, code)
 );
 
--- Шкала перевода баллов в оценку (например 5–10 баллов → 3)
 CREATE TABLE IF NOT EXISTS grade_scale_rules (
     id SERIAL PRIMARY KEY,
     schedule_id INTEGER NOT NULL REFERENCES schedule(id) ON DELETE CASCADE,

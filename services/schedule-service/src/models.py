@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Date, Table
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Date, Table, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .database import Base
@@ -89,3 +89,14 @@ class Schedule(Base):
     group = relationship("Group")
     teacher = relationship("Teacher")
     room = relationship("Room")
+
+class LessonComment(Base):
+    __tablename__ = "lesson_comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
+    schedule_id = Column(Integer, ForeignKey("schedule.id", ondelete="CASCADE"), nullable=False)
+    lesson_date = Column(Date, nullable=False)
+    comment = Column(Text, nullable=False, default="")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -17,6 +17,7 @@ services:
       - ./database/03_students.sql:/docker-entrypoint-initdb.d/03_students.sql
       - ./database/04_grade_scaling.sql:/docker-entrypoint-initdb.d/04_grade_scaling.sql
       - ./database/05_grade_column_settings.sql:/docker-entrypoint-initdb.d/05_grade_column_settings.sql
+      - ./database/06_lesson_comments.sql:/docker-entrypoint-initdb.d/06_lesson_comments.sql
     ports:
       - "5432:5432"
     restart: unless-stopped

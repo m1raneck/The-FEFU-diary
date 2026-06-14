@@ -38,6 +38,7 @@
               <th>Дата</th>
               <th>Оценка</th>
               <th>Посещение</th>
+              <th>Комментарий</th>
             </tr>
           </thead>
           <tbody>
@@ -49,6 +50,7 @@
                   {{ row.present === null ? '—' : (row.present ? 'Присутствовал' : 'Отсутствовал') }}
                 </span>
               </td>
+              <td class="comment-cell">{{ row.comment || '—' }}</td>
             </tr>
           </tbody>
         </table>
@@ -64,7 +66,7 @@
 
 <script>
 import { getSchedule } from '@/services/schedule'
-import { getGrades, getAttendance } from '@/services/marks'
+import { getGrades, getAttendance, getLessonComments, normalizeDate } from '@/services/marks'
 import { getStoredUser, fetchAndStoreProfile, logout as authLogout, isStudent } from '@/services/auth'
 
 export default {
@@ -111,38 +113,46 @@ export default {
       this.loading = true
       this.error = ''
       try {
-        const [schedule, grades, attendance] = await Promise.all([
+        const [schedule, grades, attendance, lessonComments] = await Promise.all([
           getSchedule(),
           getGrades(),
-          getAttendance()
+          getAttendance(),
+          getLessonComments(),
         ])
 
         const scheduleMap = Object.fromEntries(schedule.map(s => [s.id, s]))
         const bySchedule = {}
 
         for (const g of grades) {
-          if (!bySchedule[g.schedule_id]) bySchedule[g.schedule_id] = { grades: [], attendance: [] }
+          if (!bySchedule[g.schedule_id]) bySchedule[g.schedule_id] = { grades: [], attendance: [], comments: [] }
           bySchedule[g.schedule_id].grades.push(g)
         }
         for (const a of attendance) {
-          if (!bySchedule[a.schedule_id]) bySchedule[a.schedule_id] = { grades: [], attendance: [] }
+          if (!bySchedule[a.schedule_id]) bySchedule[a.schedule_id] = { grades: [], attendance: [], comments: [] }
           bySchedule[a.schedule_id].attendance.push(a)
+        }
+        for (const c of lessonComments) {
+          if (!bySchedule[c.schedule_id]) bySchedule[c.schedule_id] = { grades: [], attendance: [], comments: [] }
+          bySchedule[c.schedule_id].comments.push(c)
         }
 
         this.subjects = Object.entries(bySchedule).map(([scheduleId, data]) => {
           const sch = scheduleMap[scheduleId]
           const dateSet = new Set()
-          data.grades.forEach(g => dateSet.add(g.grade_date))
-          data.attendance.forEach(a => dateSet.add(a.date))
-          const dates = [...dateSet].sort()
+          data.grades.forEach(g => dateSet.add(normalizeDate(g.grade_date)))
+          data.attendance.forEach(a => dateSet.add(normalizeDate(a.date)))
+          data.comments.forEach(c => dateSet.add(normalizeDate(c.lesson_date)))
+          const dates = [...dateSet].filter(Boolean).sort()
 
           const rows = dates.map(iso => {
-            const g = data.grades.find(x => x.grade_date === iso)
-            const a = data.attendance.find(x => x.date === iso)
+            const g = data.grades.find(x => normalizeDate(x.grade_date) === iso)
+            const a = data.attendance.find(x => normalizeDate(x.date) === iso)
+            const c = data.comments.find(x => normalizeDate(x.lesson_date) === iso)
             return {
               date: iso,
               dateLabel: this.formatDate(iso),
               grade: g?.grade ?? null,
+              comment: c?.comment || '',
               present: a ? (a.status === 'present' || a.status === 'late') : null
             }
           })
@@ -330,6 +340,7 @@ export default {
 .grade.low { color: #b13b3b; }
 .pres-yes { color: #1f9755; }
 .pres-no { color: #cc4d4d; }
+.comment-cell { font-size: 13px; color: #4a6f8c; max-width: 240px; }
 .card-footer {
   padding: 12px 20px;
   font-size: 13px;

@@ -234,7 +234,7 @@
 
 <script setup>
 import { ref, nextTick, onMounted, onBeforeUnmount, computed, watch } from 'vue'
-import { getStudents, getGrades, getAttendance, saveGrade, saveAttendance, bulkSaveGrades, getGradeScale, saveGradeScale, getGradeCategories, saveGradeCategories, getGradeColumns, saveGradeColumns } from '@/services/marks'
+import { getStudents, getGrades, getAttendance, getLessonComments, saveGrade, saveAttendance, saveLessonComment, bulkSaveGrades, getGradeScale, saveGradeScale, getGradeCategories, saveGradeCategories, getGradeColumns, saveGradeColumns, normalizeDate } from '@/services/marks'
 
 const props = defineProps({ 
   subjectName: { type: String, default: 'Базы данных' },
@@ -478,9 +478,10 @@ async function loadMarksFromDb() {
   if (!props.scheduleId) return
 
   try {
-    const [grades, attendance] = await Promise.all([
+    const [grades, attendance, lessonComments] = await Promise.all([
       getGrades(props.scheduleId),
-      getAttendance(props.scheduleId)
+      getAttendance(props.scheduleId),
+      getLessonComments(props.scheduleId),
     ])
 
     if (inferColumnsFromGrades(grades)) {
@@ -493,7 +494,14 @@ async function loadMarksFromDb() {
       if (sIdx !== -1 && dIdx !== -1) {
         const display = g.raw_score != null ? g.raw_score : g.grade
         if (display != null) students.value[sIdx].records[dIdx].grade = display
-        students.value[sIdx].records[dIdx].comment = g.comment || ''
+      }
+    }
+
+    for (const c of lessonComments) {
+      const sIdx = students.value.findIndex(s => s.id === c.student_id)
+      const dIdx = isoToDateIdx(normalizeDate(c.lesson_date))
+      if (sIdx !== -1 && dIdx !== -1) {
+        students.value[sIdx].records[dIdx].comment = c.comment || ''
       }
     }
 
@@ -671,13 +679,11 @@ async function applyMultiImport() {
       let finalGrade = col.useGradeScale ? convertScoreToGrade(percent) : Math.min(percent, 100)
       if (col.useGradeScale && finalGrade === null) finalGrade = percent
 
-      const rec = student.records[targetColIdx]
       gradesToSend.push({
         student_id: studentId,
         raw_score: percent,
         auto_convert: col.useGradeScale,
         grade: col.useGradeScale ? convertScoreToGrade(percent) : Math.min(percent, 100),
-        comment: rec?.comment || ''
       })
     }
 
@@ -837,10 +843,9 @@ function confirmGrade() {
 
 function gradePayloadForCell(sIdx, dIdx, overrides = {}) {
   const student = students.value[sIdx]
-  const rec = student.records[dIdx]
   const cfg = columnSettings.value[dIdx]
   const category = categoryWeights.value.find(c => c.code === cfg.categoryCode)
-  const rawScore = parseCellScore(rec.grade)
+  const rawScore = parseCellScore(student.records[dIdx].grade)
   return {
     studentId: student.id,
     scheduleId: props.scheduleId,
@@ -848,7 +853,6 @@ function gradePayloadForCell(sIdx, dIdx, overrides = {}) {
     autoConvert: false,
     categoryId: category?.id ?? null,
     gradeDate: dateToIso(dates[dIdx]),
-    comment: rec.comment || '',
     ...overrides,
   }
 }
@@ -885,9 +889,15 @@ async function confirmComment() {
 
 async function persistComment(sIdx, dIdx) {
   if (!props.scheduleId) return
-  const rec = students.value[sIdx].records[dIdx]
+  const student = students.value[sIdx]
+  const rec = student.records[dIdx]
   try {
-    await saveGrade(gradePayloadForCell(sIdx, dIdx, { comment: rec.comment || '' }))
+    await saveLessonComment({
+      studentId: student.id,
+      scheduleId: props.scheduleId,
+      lessonDate: dateToIso(dates[dIdx]),
+      comment: rec.comment || '',
+    })
     setImportMsg('✅ Комментарий сохранён', 'success')
   } catch (err) {
     console.error('Ошибка сохранения комментария', err)
