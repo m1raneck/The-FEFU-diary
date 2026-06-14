@@ -11,7 +11,7 @@ from fefu_common.tokens import create_access_token
 from . import database, models, schemas
 
 app = FastAPI(title="Auth Service")
-register_health_route(app, "auth-service")
+register_health_route(app, "auth-service", database.get_db)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

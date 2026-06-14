@@ -12,7 +12,7 @@ from fefu_common.health import register_health_route
 from . import database, grading_helpers, models, schemas
 
 app = FastAPI(title="Grades Service")
-register_health_route(app, "grades-service")
+register_health_route(app, "grades-service", database.get_db)
 
 auth_deps = AuthDependencies(models.User, database.get_db)
 get_current_user = auth_deps.current_user_dependency()

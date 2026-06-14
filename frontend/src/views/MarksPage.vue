@@ -110,6 +110,14 @@
                      :title="rec.present ? 'Отметить отсутствие' : 'Отметить присутствие'">
                   {{ rec.present ? '✓' : '✗' }}
                 </div>
+                <div
+                  class="combo-comment"
+                  :class="{ 'has-comment': rec.comment }"
+                  @click.stop="editComment(sIdx, dIdx)"
+                  :title="rec.comment || 'Добавить комментарий'"
+                >
+                  💬
+                </div>
               </div>
             </td>
           </tr>
@@ -121,7 +129,7 @@
       <span class="legend-item"><span class="leg-dot pres-dot"></span>Присутствовал</span>
       <span class="legend-item"><span class="leg-dot abs-dot"></span>Отсутствовал</span>
       <span class="legend-sep">|</span>
-      <span class="legend-item">Левая часть — балл → % (× коэф), правая — посещение</span>
+      <span class="legend-item">Оценка | посещение | 💬 комментарий</span>
     </div>
 
     <!-- Popup для выбора типа колонки -->
@@ -192,6 +200,30 @@
             <div class="grade-actions">
               <button class="btn-cancel" @click="gradeInput.visible=false">Отмена</button>
               <button class="btn-ok" @click="confirmGrade">Сохранить</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Модалка для комментария -->
+    <Teleport to="body">
+      <Transition name="fade-scale">
+        <div v-if="commentInput.visible" class="grade-overlay" @click.self="commentInput.visible = false">
+          <div class="grade-popup comment-popup">
+            <div class="grade-popup-name">{{ commentInput.studentName }}</div>
+            <div class="grade-popup-sub">{{ commentInput.dateLabel }}</div>
+            <textarea
+              ref="commentInputRef"
+              v-model="commentInput.value"
+              class="comment-field"
+              rows="4"
+              placeholder="Комментарий к паре..."
+              @keyup.esc="commentInput.visible = false"
+            />
+            <div class="grade-actions">
+              <button class="btn-cancel" @click="commentInput.visible = false">Отмена</button>
+              <button class="btn-ok" @click="confirmComment">Сохранить</button>
             </div>
           </div>
         </div>
@@ -376,7 +408,7 @@ async function loadStudents() {
       name: s.full_name,
       avg: 0,
       attendance: 0,
-      records: dates.map(() => ({ grade: '', present: true }))
+      records: dates.map(() => ({ grade: '', present: true, comment: '' }))
     }))
     
     filtered.forEach(s => {
@@ -461,6 +493,7 @@ async function loadMarksFromDb() {
       if (sIdx !== -1 && dIdx !== -1) {
         const display = g.raw_score != null ? g.raw_score : g.grade
         if (display != null) students.value[sIdx].records[dIdx].grade = display
+        students.value[sIdx].records[dIdx].comment = g.comment || ''
       }
     }
 
@@ -638,12 +671,13 @@ async function applyMultiImport() {
       let finalGrade = col.useGradeScale ? convertScoreToGrade(percent) : Math.min(percent, 100)
       if (col.useGradeScale && finalGrade === null) finalGrade = percent
 
+      const rec = student.records[targetColIdx]
       gradesToSend.push({
         student_id: studentId,
         raw_score: percent,
         auto_convert: col.useGradeScale,
         grade: col.useGradeScale ? convertScoreToGrade(percent) : Math.min(percent, 100),
-        comment: ''
+        comment: rec?.comment || ''
       })
     }
 
@@ -717,6 +751,8 @@ async function saveScaleSettings() {
 const popup = ref({ visible: false, x: 0, y: 0, dIndex: null })
 const gradeInput = ref({ visible: false, sIdx: null, dIdx: null, value: '', typeName: '', studentName: '' })
 const gradeInputRef = ref(null)
+const commentInput = ref({ visible: false, sIdx: null, dIdx: null, value: '', studentName: '', dateLabel: '' })
+const commentInputRef = ref(null)
 
 function getAvgClass(avg) {
   if (avg === '—' || avg === '' || avg == null) return ''
@@ -799,22 +835,62 @@ function confirmGrade() {
   persistGrade(sIdx, dIdx, num)
 }
 
-async function persistGrade(sIdx, dIdx, gradeValue) {
-  if (!props.scheduleId) return
+function gradePayloadForCell(sIdx, dIdx, overrides = {}) {
   const student = students.value[sIdx]
+  const rec = student.records[dIdx]
   const cfg = columnSettings.value[dIdx]
   const category = categoryWeights.value.find(c => c.code === cfg.categoryCode)
+  const rawScore = parseCellScore(rec.grade)
+  return {
+    studentId: student.id,
+    scheduleId: props.scheduleId,
+    rawScore,
+    autoConvert: false,
+    categoryId: category?.id ?? null,
+    gradeDate: dateToIso(dates[dIdx]),
+    comment: rec.comment || '',
+    ...overrides,
+  }
+}
+
+async function persistGrade(sIdx, dIdx, gradeValue) {
+  if (!props.scheduleId) return
   try {
-    await saveGrade({
-      studentId: student.id,
-      scheduleId: props.scheduleId,
-      rawScore: gradeValue,
-      autoConvert: false,
-      categoryId: category?.id ?? null,
-      gradeDate: dateToIso(dates[dIdx]),
-    })
+    await saveGrade(gradePayloadForCell(sIdx, dIdx, { rawScore: gradeValue }))
   } catch (err) {
     console.error('Ошибка сохранения оценки', err)
+    setImportMsg(`❌ ${err.message}`, 'error')
+  }
+}
+
+async function editComment(sIdx, dIdx) {
+  commentInput.value = {
+    visible: true,
+    sIdx,
+    dIdx,
+    value: students.value[sIdx].records[dIdx].comment || '',
+    studentName: students.value[sIdx].name,
+    dateLabel: dates[dIdx],
+  }
+  await nextTick()
+  commentInputRef.value?.focus()
+}
+
+async function confirmComment() {
+  const { sIdx, dIdx, value } = commentInput.value
+  students.value[sIdx].records[dIdx].comment = value.trim()
+  commentInput.value.visible = false
+  await persistComment(sIdx, dIdx)
+}
+
+async function persistComment(sIdx, dIdx) {
+  if (!props.scheduleId) return
+  const rec = students.value[sIdx].records[dIdx]
+  try {
+    await saveGrade(gradePayloadForCell(sIdx, dIdx, { comment: rec.comment || '' }))
+    setImportMsg('✅ Комментарий сохранён', 'success')
+  } catch (err) {
+    console.error('Ошибка сохранения комментария', err)
     setImportMsg(`❌ ${err.message}`, 'error')
   }
 }
@@ -1024,7 +1100,7 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
 .avg-mid { background: #feefcf; color: #b76e00; }
 .avg-bad { background: #ecdcdc; color: #b13b3b; }
 .warn-att { color: #b13b3b; font-weight: 600; }
-.date-col { min-width: 90px; }
+.date-col { min-width: 110px; }
 .date-text { font-size: 12px; font-weight: 600; color: #19486a; margin-bottom: 6px; }
 .type-selector {
   cursor: pointer;
@@ -1047,7 +1123,7 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
   border: 1px solid #5e80a1;
   overflow: hidden;
 }
-.combo-grade { flex: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.combo-grade { flex: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; min-width: 0; }
 .combo-grade:hover { background: #f6fafe; }
 .grade-val { font-weight: 600; font-size: 13px; color: #1a2c44; display: inline-flex; align-items: center; gap: 2px; flex-wrap: wrap; justify-content: center; line-height: 1.2; }
 .grade-raw { font-weight: 700; }
@@ -1057,12 +1133,50 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
 .g-good { color: #1f6e43; font-weight: 700; }
 .g-low { color: #b13b3b; font-weight: 700; }
 .combo-presence {
-  width: 32px;
+  width: 28px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   font-size: 16px;
+  border-left: 1px solid #5e80a1;
+}
+.combo-comment {
+  width: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 13px;
+  background: #b8c9df;
+  color: #3d5a7a;
+  border-left: 1px solid #5e80a1;
+  transition: background 0.15s;
+}
+.combo-comment:hover { background: #d4e3f5; }
+.combo-comment.has-comment {
+  background: #7eb3e8;
+  color: #0e3a66;
+  font-weight: 700;
+}
+.comment-popup { width: 320px; }
+.comment-field {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #cfdfed;
+  border-radius: 16px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  background: #f6fafe;
+  color: #1a2c44;
+  box-sizing: border-box;
+}
+.comment-field:focus {
+  outline: none;
+  border-color: #2c6e9e;
 }
 .pres-yes { background: #add7c0; color: #1f9755; }
 .pres-yes:hover { background: rgb(103, 166, 125); }

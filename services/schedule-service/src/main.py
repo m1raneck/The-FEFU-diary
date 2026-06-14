@@ -9,7 +9,7 @@ from fefu_common.health import register_health_route
 from . import database, models, schemas
 
 app = FastAPI(title="Schedule Service")
-register_health_route(app, "schedule-service")
+register_health_route(app, "schedule-service", database.get_db)
 
 auth_deps = AuthDependencies(models.User, database.get_db)
 get_current_user = auth_deps.current_user_dependency()

@@ -107,7 +107,7 @@ async function load() {
         date: iso,
         dateLabel: formatDate(iso),
         grade: g?.grade ?? null,
-        comment: g?.comment || '',
+        comment: g?.comment || a?.comment || '',
         present: a ? (a.status === 'present' || a.status === 'late') : null
       }
     })

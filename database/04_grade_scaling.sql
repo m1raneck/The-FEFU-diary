@@ -5,7 +5,6 @@ CREATE TABLE IF NOT EXISTS grade_categories (
     code VARCHAR(20) NOT NULL,
     name VARCHAR(100) NOT NULL,
     weight NUMERIC(6, 4) NOT NULL CHECK (weight > 0),
-    max_points NUMERIC(10, 2) NOT NULL DEFAULT 100 CHECK (max_points > 0),
     UNIQUE (schedule_id, code)
 );
 
