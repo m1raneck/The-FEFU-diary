@@ -19,8 +19,7 @@ const routes = [
   {
     path: '/schedule',
     name: 'Schedule',
-    component: SchedulePage,
-    meta: { requiresAuth: true }
+    component: () => import('@/views/SchedulePage.vue')
   },
   {
     path: '/my-grades',

@@ -49,4 +49,12 @@ export function logout() {
   localStorage.removeItem('user')
 }
 
+export async function requestPasswordReset(email) {
+  const data = await apiPublicPost('/api/auth/forgot-password', { email })
+  if (data.status !== 'success') {
+    throw new Error(data.message || 'Ошибка отправки ссылки')
+  }
+  return data
+}
+
 export { getToken } from './api'
