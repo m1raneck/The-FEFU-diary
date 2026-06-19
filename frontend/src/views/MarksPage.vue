@@ -15,6 +15,15 @@
       <div class="import-panel">
         <div class="import-controls">
           <button class="sample-btn" @click="downloadSampleCSV">Пример CSV</button>
+          <div class="export-dropdown" ref="exportDropdownRef">
+            <button type="button" class="sample-btn export-trigger" @click.stop="toggleExportMenu">
+              📥 Экспорт
+            </button>
+            <div v-if="exportMenuOpen" class="export-menu" @click.stop>
+              <button type="button" class="export-menu-item" @click="pickExportFormat('csv')">CSV (.csv)</button>
+              <button type="button" class="export-menu-item" @click="pickExportFormat('excel')">Excel (.xls)</button>
+            </div>
+          </div>
           <label class="import-file-btn">
             Загрузить CSV
             <input type="file" accept=".csv" @change="handleFileUpload" style="display: none" ref="fileInput" />
@@ -34,6 +43,16 @@
               placeholder="0"
             />
             <button v-if="minAttendanceFilter > 0" type="button" class="filter-reset" @click="minAttendanceFilter = 0">×</button>
+          </div>
+          <div class="student-search">
+            <span class="filter-label">Поиск:</span>
+            <input
+              type="search"
+              class="search-input"
+              v-model="studentSearchQuery"
+              placeholder="ФИО студента"
+            />
+            <button v-if="studentSearchQuery" type="button" class="filter-reset" @click="studentSearchQuery = ''">×</button>
           </div>
         </div>
 
@@ -87,6 +106,9 @@
             </tr>
           </thead>
           <tbody>
+            <tr v-if="visibleStudentEntries.length === 0" class="empty-row">
+              <td :colspan="4 + dates.length" class="empty-cell">Студенты не найдены</td>
+            </tr>
             <tr v-for="({ student, sIdx }, idx) in visibleStudentEntries" :key="student.id" class="student-row">
               <td class="col-num">{{ idx + 1 }}</td>
               <td class="col-name">{{ student.name }}</td>
@@ -272,14 +294,18 @@ const columnSettings = ref(dates.map(() => ({ type: null, categoryCode: null }))
 const students = ref([])
 const studentsMap = ref(new Map())
 const minAttendanceFilter = ref(0)
+const studentSearchQuery = ref('')
 
-const visibleStudentEntries = computed(() =>
-  students.value
+const visibleStudentEntries = computed(() => {
+  const q = studentSearchQuery.value.trim().toLowerCase()
+  return students.value
     .map((student, sIdx) => ({ student, sIdx }))
-    .filter(({ student }) =>
-      !minAttendanceFilter.value || (student.attendanceCount ?? 0) >= minAttendanceFilter.value
-    )
-)
+    .filter(({ student }) => {
+      if (minAttendanceFilter.value && (student.attendanceCount ?? 0) < minAttendanceFilter.value) return false
+      if (q && !student.name.toLowerCase().includes(q)) return false
+      return true
+    })
+})
 
 const gradeScale = ref({
   from2: 0, to2: 40,
@@ -572,6 +598,8 @@ const multiPreview = ref([])
 const importMessage = ref('')
 const importMessageType = ref('info')
 const fileInput = ref(null)
+const exportMenuOpen = ref(false)
+const exportDropdownRef = ref(null)
 
 const hasEnabledMappings = computed(() => csvScoreColumns.value.some(c => c.targetDateIdx !== undefined))
 
@@ -982,6 +1010,17 @@ async function persistAttendance(sIdx, dIdx) {
 function handleClickOutside(e) {
   if (!e.target.closest('.type-popup')) closePopup()
   if (scalePopup.value.visible && !e.target.closest('.scale-popup')) scalePopup.value.visible = false
+  if (exportMenuOpen.value && !e.target.closest('.export-dropdown')) exportMenuOpen.value = false
+}
+
+function toggleExportMenu() {
+  exportMenuOpen.value = !exportMenuOpen.value
+}
+
+function pickExportFormat(format) {
+  exportMenuOpen.value = false
+  if (format === 'csv') exportJournalCsv()
+  else exportJournalExcel()
 }
 
 function downloadSampleCSV() {
@@ -992,13 +1031,157 @@ function downloadSampleCSV() {
     ['Углицкий Евгений', '78', '91'],
     ['Смирнов Григорий', '94', '73']
   ]
-  const csv = sampleRows.map(r => r.join(',')).join('\n')
-  const blob = new Blob([csv], { type: 'text/csv' })
+  downloadStyledExcelFile('example_marks.xls', sampleRows)
+}
+
+function sanitizeFileName(value) {
+  return String(value || 'journal')
+    .replace(/[<>:"/\\|?*]/g, '_')
+    .replace(/\s+/g, '_')
+    .slice(0, 60)
+}
+
+function escapeCsvCell(value) {
+  const s = String(value ?? '')
+  if (/[",;\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`
+  return s
+}
+
+function formatGradeForExport(grade, dIdx) {
+  if (grade === '' || grade == null) return '—'
+  if (grade === '+' || grade === '-') return grade
+  const parts = gradeDisplayParts(grade, dIdx)
+  if (parts.showPercent) return `${parts.raw} (${parts.pct}%)`
+  return String(parts.raw ?? grade)
+}
+
+function buildJournalExportRows() {
+  const header = ['№', 'ФИО', 'Ср.', 'П.%']
+  dates.forEach((date, dIdx) => {
+    const type = getTypeLabel(columnSettings.value[dIdx].type)
+    header.push(`${date} (${type})`)
+    header.push(`${date} посещ.`)
+    header.push(`${date} комм.`)
+  })
+
+  const rows = students.value.map((student, index) => {
+    const row = [
+      index + 1,
+      student.name,
+      student.avg ?? '—',
+      `${student.attendance ?? 0}%`,
+    ]
+    student.records.forEach((rec, dIdx) => {
+      row.push(formatGradeForExport(rec.grade, dIdx))
+      row.push(rec.present ? '✓' : '✗')
+      row.push(rec.comment || '')
+    })
+    return row
+  })
+
+  return [header, ...rows]
+}
+
+function escapeHtmlCell(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function cellAlignForExport(colIdx) {
+  if (colIdx === 0 || colIdx === 2 || colIdx === 3) return 'right'
+  if (colIdx === 1) return 'left'
+  const subIdx = (colIdx - 4) % 3
+  if (subIdx === 0) return 'right'
+  if (subIdx === 1) return 'center'
+  return 'left'
+}
+
+function buildStyledExcelHtml(rows) {
+  const [headerRow, ...bodyRows] = rows
+  const isNameFirstSheet =
+    headerRow.length >= 2 &&
+    (String(headerRow[0]).includes('Студент') || String(headerRow[0]).includes('ФИО'))
+  const alignFor = colIdx => {
+    if (isNameFirstSheet && headerRow.length <= 4) {
+      return colIdx === 0 ? 'left' : 'right'
+    }
+    return cellAlignForExport(colIdx)
+  }
+  const baseCell =
+    'font-family: Times New Roman, Times, serif; font-size: 11pt; border: 1px solid #b0b0b0; padding: 2px 6px;'
+  const thStyle = `${baseCell} background: #d9d9d9; font-weight: bold; text-align: center;`
+  const headerHtml =
+    '<tr>' +
+    headerRow.map(c => `<th style="${thStyle}">${escapeHtmlCell(c)}</th>`).join('') +
+    '</tr>'
+  const bodyHtml = bodyRows
+    .map(row => {
+      const cells = row
+        .map((c, colIdx) => {
+          const align = alignFor(colIdx)
+          const tdStyle = `${baseCell} text-align: ${align};`
+          return `<td style="${tdStyle}">${escapeHtmlCell(c)}</td>`
+        })
+        .join('')
+      return `<tr>${cells}</tr>`
+    })
+    .join('')
+
+  return [
+    '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">',
+    '<head><meta charset="utf-8">',
+    '<style>table { border-collapse: collapse; } td, th { font-family: Times New Roman, Times, serif; font-size: 11pt; }</style>',
+    '</head><body><table>',
+    headerHtml,
+    bodyHtml,
+    '</table></body></html>',
+  ].join('')
+}
+
+function downloadCsvFile(filename, rows) {
+  const sep = ';'
+  const body = rows
+    .map(row => row.map(cell => escapeCsvCell(cell)).join(sep))
+    .join('\r\n')
+  const blob = new Blob(['\uFEFF' + body], { type: 'text/csv;charset=utf-8' })
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
-  a.download = 'example_marks.csv'
+  a.download = filename
   a.click()
   URL.revokeObjectURL(a.href)
+}
+
+function downloadStyledExcelFile(filename, rows) {
+  const html = buildStyledExcelHtml(rows)
+  const blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
+
+function exportJournalCsv() {
+  if (!students.value.length) {
+    setImportMsg('Нет данных для экспорта', 'error')
+    return
+  }
+  const name = sanitizeFileName(`${props.groupName}_${props.subjectName}`)
+  downloadCsvFile(`journal_${name}.csv`, buildJournalExportRows())
+  setImportMsg('✅ Журнал экспортирован в CSV', 'success')
+}
+
+function exportJournalExcel() {
+  if (!students.value.length) {
+    setImportMsg('Нет данных для экспорта', 'error')
+    return
+  }
+  const name = sanitizeFileName(`${props.groupName}_${props.subjectName}`)
+  downloadStyledExcelFile(`journal_${name}.xls`, buildJournalExportRows())
+  setImportMsg('✅ Журнал экспортирован в Excel', 'success')
 }
 
 // ========== Жизненный цикл ==========
@@ -1132,6 +1315,42 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
 .scale-settings-btn:hover {
   background: rgba(82, 156, 209, 0.5);
   color: white;
+}
+
+.export-dropdown {
+  position: relative;
+}
+
+.export-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  background: #f8fbff;
+  border: 0.5px solid rgba(112, 165, 218, 0.5);
+  border-radius: 16px;
+  padding: 6px;
+  min-width: 168px;
+  box-shadow: 0 4px 16px rgba(30, 60, 100, 0.15);
+}
+
+.export-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1f4a6e;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.export-menu-item:hover {
+  background: rgba(82, 156, 209, 0.25);
 }
 
 .multi-import-container {
@@ -1893,6 +2112,35 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
   cursor: pointer;
   font-size: 14px;
   line-height: 1;
+}
+
+.student-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 20px;
+  border: 1px solid rgba(100, 160, 200, 0.45);
+}
+
+.search-input {
+  width: 140px;
+  padding: 4px 8px;
+  border: 1px solid #b8cfdf;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.search-input::placeholder {
+  color: #8aa8c4;
+}
+
+.empty-cell {
+  text-align: center;
+  padding: 24px;
+  color: #5c6f8c;
+  font-size: 14px;
 }
 
 .grade-raw { font-weight: 700; }
