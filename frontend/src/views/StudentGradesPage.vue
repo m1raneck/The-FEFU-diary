@@ -43,8 +43,8 @@
                 <tr v-for="row in subj.rows" :key="row.date">
                   <td class="date-cell">{{ row.dateLabel }}</td>
                   <td class="grade-cell">
-                    <span class="grade-chip" :class="gradeClass(row.grade)">
-                      {{ row.grade ?? '—' }}
+                    <span class="grade-chip" :class="gradeChipClass(row.grade)">
+                      {{ formatGrade(row.grade) }}
                     </span>
                   </td>
                   <td class="attendance-cell">
@@ -99,26 +99,34 @@ export default {
       await this.loadGrades()
     } catch (e) {
       this.error = e.message || 'Ошибка загрузки'
+    } finally {
       this.loading = false
     }
   },
   methods: {
-    gradeClass(grade) {
-      if (grade == null) return ''
-      if (grade >= 4) return 'good'
-      if (grade >= 3) return 'mid'
-      return 'low'
+    gradeChipClass(grade) {
+      if (grade === '+') return 'chip-plus'
+      if (grade === '-') return 'chip-minus'
+      const num = parseFloat(grade)
+      if (!isNaN(num)) {
+        if (num >= 4) return 'chip-good'
+        return 'chip-bad'
+      }
+      return 'chip-empty'
+    },
+    formatGrade(grade) {
+      if (grade === '+') return '+'
+      if (grade === '-') return '−'
+      if (grade == null) return '—'
+      return grade
     },
     attendanceChipClass(present) {
       if (present === null) return ''
-      return present ? 'present' : 'absent'
+      return present ? 'chip-present' : 'chip-absent'
     },
     attendanceText(present) {
       if (present === null) return '—'
-      return present ? 'Присутствовал' : 'Отсутствовал'
-    },
-    goToSchedule() {
-      this.$router.push('/schedule')
+      return present ? '✓' : '✗'
     },
     formatDate(iso) {
       const [y, m, d] = iso.split('-')
@@ -177,8 +185,9 @@ export default {
             ? Math.round(gradeNums.reduce((a, b) => a + b, 0) / gradeNums.length)
             : null
           const known = rows.filter(r => r.present !== null)
+          const attendanceCount = known.filter(r => r.present).length
           const attendancePct = known.length
-            ? Math.round((known.filter(r => r.present).length / known.length) * 100)
+            ? Math.round((attendanceCount / known.length) * 100)
             : 0
 
           return {
@@ -187,14 +196,17 @@ export default {
             room: sch?.room?.number || '',
             rows,
             avg,
-            attendancePct
+            attendancePct,
+            attendanceCount,
+            attendancePoints: attendanceCount,
           }
         }).sort((a, b) => a.name.localeCompare(b.name))
       } catch (e) {
         this.error = e.message || 'Ошибка загрузки'
-      } finally {
-        this.loading = false
       }
+    },
+    goToSchedule() {
+      this.$router.push('/schedule')
     },
     logout() {
       authLogout()
@@ -263,16 +275,16 @@ export default {
   cursor: pointer;
 }
 .schedule-btn {
-  background: linear-gradient(to bottom, #8fbee6, #537ac2);
-  border: 1px solid rgba(79, 107, 200, 0.7);
-  border-radius: 25px;
-  padding: 10px 20px;
-  color: white;
+  background: linear-gradient(to bottom, #75b5f0, #2d5ca4);
+  border: 1px solid rgba(119, 155, 222, 0.7);
+  border-radius: 30px;
+  padding: 10px 18px;
+  color: #ffffff;
   font-weight: 600;
   font-size: 14px;
 }
 .schedule-btn:hover {
-  background: linear-gradient(to bottom, #85b5de, #385ca0);
+  background: linear-gradient(to bottom, #66a3db, #27559b);
   transform: translateY(-1px);
 }
 .user-avatar {

@@ -58,7 +58,6 @@ defineEmits(['close'])
 
 const loading = ref(true)
 const error = ref('')
-const dates = ref([])
 const rows = ref([])
 
 const avg = computed(() => {
@@ -67,23 +66,26 @@ const avg = computed(() => {
   return Math.round(nums.reduce((a, b) => a + b, 0) / nums.length)
 })
 
+const attendanceCount = computed(() =>
+  rows.value.filter(r => r.present === true).length
+)
+
 const attendancePct = computed(() => {
   const known = rows.value.filter(r => r.present !== null)
   if (!known.length) return 0
-  const present = known.filter(r => r.present).length
-  return Math.round((present / known.length) * 100)
+  return Math.round((attendanceCount.value / known.length) * 100)
 })
+
+function gradeClass(grade) {
+  if (grade == null) return ''
+  if (grade >= 4) return 'good'
+  if (grade >= 3) return 'mid'
+  return 'low'
+}
 
 function formatDate(iso) {
   const [y, m, d] = iso.split('-')
   return `${d}.${m}.${y}`
-}
-
-function gradeClass(grade) {
-  if (grade == null) return ''
-  if (grade >= 80) return 'good'
-  if (grade >= 60) return 'mid'
-  return 'low'
 }
 
 async function load() {
@@ -100,9 +102,9 @@ async function load() {
     grades.forEach(g => dateSet.add(normalizeDate(g.grade_date)))
     attendance.forEach(a => dateSet.add(normalizeDate(a.date)))
     lessonComments.forEach(c => dateSet.add(normalizeDate(c.lesson_date)))
-    dates.value = [...dateSet].filter(Boolean).sort()
+    const dates = [...dateSet].filter(Boolean).sort()
 
-    rows.value = dates.value.map(iso => {
+    rows.value = dates.map(iso => {
       const g = grades.find(x => normalizeDate(x.grade_date) === iso)
       const a = attendance.find(x => normalizeDate(x.date) === iso)
       const c = lessonComments.find(x => normalizeDate(x.lesson_date) === iso)
@@ -132,200 +134,138 @@ onMounted(load)
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  padding: 1rem;
+  font-family: 'Inter', system-ui, sans-serif;
 }
 
 .marks-card {
   width: 100%;
-  background: linear-gradient(145deg,
-    rgba(255, 255, 255, 0.65) 22%,
-    rgba(188, 207, 226, 0.45) 79%,
-    rgba(149, 169, 195, 0.55) 100%);
-  backdrop-filter: blur(12px) brightness(105%);
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  border-radius: 30px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+  max-width: 720px;
+  background: linear-gradient(145deg, rgba(245, 250, 255, 0.65) 22%, rgba(210, 230, 245, 0.45) 79%, rgba(180, 205, 225, 0.65) 100%);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 28px;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.2);
   overflow: hidden;
-  transition: all 0.2s ease;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.5rem 2rem;
-  background: rgba(227, 240, 255, 0.25);
-  border-bottom: 1px solid rgba(86, 112, 193, 0.3);
+  padding: 1.2rem 1.5rem;
+  background: rgba(227, 240, 255, 0.35);
+  border-bottom: 1px solid rgba(86, 112, 193, 0.25);
 }
 
 .subject-badge {
-  background: rgba(102, 137, 202, 0.8);
-  border-radius: 44px;
-  padding: 10px 28px;
-  font-size: 20px;
-  font-weight: 700;
-  color: #f0f5fc;
-  letter-spacing: -0.3px;
-  backdrop-filter: blur(4px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.5);
+  padding: 8px 18px;
+  border-radius: 30px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f4a6e;
+  border: 1px solid rgba(100, 160, 200, 0.6);
 }
 
 .close-btn {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  font-size: 24px;
-  font-weight: 600;
-  color: #2c3e4f;
+  background: linear-gradient(to bottom, #ebf5ff, #abc7f2);
+  border: 0.5px solid rgba(26, 104, 157, 0.6);
+  font-size: 18px;
+  color: #1f4a6e;
   cursor: pointer;
-  transition: 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.close-btn:hover {
-  background: rgba(255, 255, 255, 0.85);
-  transform: scale(1.02);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
 .state-message {
-  padding: 3rem 2rem;
+  padding: 2rem;
   text-align: center;
-  font-size: 18px;
-  font-weight: 500;
-  color: #2c3e4f;
-  background: rgba(255,255,255,0.4);
+  color: #1f4a6e;
 }
+
 .state-message.error {
-  color: #b13b3b;
+  color: #c0392b;
 }
 
 .table-container {
-  margin: 1.8rem 2rem;
-  overflow-x: auto;
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(2px);
-  border: 0.5px solid rgba(111, 138, 202, 0.9);
+  padding: 1rem 1.5rem;
 }
 
 .marks-table {
   width: 100%;
   border-collapse: collapse;
-  font-family: 'Inter', system-ui, sans-serif;
-  font-size: 14px;
 }
 
 .marks-table th {
-  background: rgba(206, 225, 255, 0.5);
-  padding: 14px 12px;
-  font-weight: 700;
-  color: #1f4a6e;
-  border-bottom: 1px solid rgba(102, 139, 190, 0.4);
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: #3d6a8c;
+  border-bottom: 2px solid rgba(100, 160, 200, 0.35);
 }
 
 .marks-table td {
-  padding: 12px;
-  text-align: center;
-  border-bottom: 1px solid rgba(116, 149, 197, 0.3);
-  background: rgba(255, 255, 255, 0.6);
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(150, 180, 210, 0.3);
   color: #1a2c44;
 }
 
-.grade-value {
-  font-weight: 700;
-  font-size: 18px;
+.date-cell {
+  font-weight: 500;
 }
-.grade-value.good { color: #1f6e43; }
-.grade-value.mid  { color: #b76e00; }
-.grade-value.low  { color: #b13b3b; }
+
+.grade-value {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.grade-value.good { color: #1e7a4a; }
+.grade-value.mid { color: #2c6e9e; }
+.grade-value.low { color: #c0392b; }
 
 .attendance-icon {
   display: inline-block;
-  width: 32px;
-  height: 32px;
-  line-height: 32px;
-  border-radius: 50%;
-  font-size: 18px;
-  font-weight: bold;
+  width: 28px;
+  height: 28px;
+  line-height: 28px;
   text-align: center;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 16px;
 }
+
 .attendance-icon.present {
-  background: #5fba8a;
-  color: white;
+  background: rgba(46, 160, 90, 0.2);
+  color: #1e7a4a;
 }
+
 .attendance-icon.absent {
-  background: #e58e8e;
-  color: white;
-}
-.attendance-icon:not(.present):not(.absent) {
-  background: rgba(200, 200, 210, 0.6);
-  color: #4a6f8c;
+  background: rgba(200, 60, 60, 0.15);
+  color: #c0392b;
 }
 
 .comment-cell {
+  font-size: 13px;
+  color: #4a6080;
   max-width: 200px;
-  word-break: break-word;
-  font-style: italic;
-  color: #4a6f8c;
 }
 
 .card-footer {
-  padding: 1rem 2rem;
-  background: rgba(227, 240, 255, 0.4);
-  border-top: 1px solid rgba(86, 112, 193, 0.3);
-  text-align: center;
-  font-size: 16px;
-  font-weight: 500;
-  color: #1f4a6e;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid rgba(100, 160, 200, 0.25);
   display: flex;
-  justify-content: center;
-  gap: 20px;
-}
-.stat b {
-  font-weight: 800;
-  color: #283347;
-}
-.divider {
-  opacity: 0.5;
+  gap: 12px;
+  align-items: center;
+  color: #1f4a6e;
+  font-size: 14px;
 }
 
-@media (max-width: 640px) {
-  .marks-card {
-    max-width: 95%;
-  }
-  .card-header {
-    padding: 1rem 1.2rem;
-  }
-  .subject-badge {
-    font-size: 16px;
-    padding: 6px 18px;
-  }
-  .close-btn {
-    width: 36px;
-    height: 36px;
-    font-size: 20px;
-  }
-  .table-container {
-    margin: 1rem;
-  }
-  .marks-table th,
-  .marks-table td {
-    padding: 8px 6px;
-    font-size: 12px;
-  }
-  .attendance-icon {
-    width: 26px;
-    height: 26px;
-    line-height: 26px;
-    font-size: 14px;
-  }
-  .card-footer {
-    font-size: 13px;
-    gap: 10px;
-  }
+.divider {
+  color: #8aa8c4;
 }
 </style>

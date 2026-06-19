@@ -1,188 +1,215 @@
 <template>
-  <div class="marks-wrapper">
-    <div class="marks-header">
-      <div class="group-name">Группа: <b>{{ groupName || 'Загрузка...' }}</b></div>
-      <div class="subject-pill">{{ subjectName }}</div>
-      <button class="close-btn" @click="$emit('close')">✕</button>
-    </div>
-
-    <div class="import-panel">
-      <div class="import-controls">
-        <label class="import-file-btn">
-          Загрузить CSV
-          <input type="file" accept=".csv" @change="handleFileUpload" style="display: none" ref="fileInput" />
-        </label>
-        <button class="sample-btn" @click="downloadSampleCSV">Пример CSV</button>
-        <button class="scale-settings-btn" @click.stop="openScalePopup($event)">⚙ Шкала и веса</button>
-        <button v-if="!importModeActive" class="switch-mode-btn" @click="activateImportMode">➕ Импорт нескольких тестов</button>
-        <button v-else class="switch-mode-btn" @click="cancelMultiImport">✕ Отменить импорт</button>
-      </div>
-
-      <div v-if="importModeActive" class="multi-import-container">
-        <div class="mapping-table">
-          <div class="mapping-row header">
-            <div>CSV колонка</div>
-            <div>Целевая дата</div>
-            <div>Перевести в оценку (2‑5)</div>
-          </div>
-          <div v-for="(col, idx) in csvScoreColumns" :key="idx" class="mapping-row">
-            <div><strong>{{ col.header }}</strong> ({{ col.sampleValues.join(', ') }}%)</div>
-            <div>
-              <select v-model="col.targetDateIdx">
-                <option v-for="(date, dIdx) in dates" :value="dIdx">{{ date }}</option>
-              </select>
-            </div>
-            <div>
-              <input type="checkbox" v-model="col.useGradeScale" />
-              <span class="hint">(по вашей шкале)</span>
-            </div>
-          </div>
+  <div class="screen-marks">
+    <div class="marks-card">
+      <div class="card-header">
+        <div class="header-left">
+          <div class="logo-mini">UniDiary</div>
         </div>
-
-        <div class="import-actions">
-          <button @click="applyMultiImport" :disabled="!hasEnabledMappings" class="apply-import-btn">📥 Выставить оценки</button>
-          <button @click="cancelMultiImport" class="cancel-import-btn">Отмена</button>
-        </div>
-
-        <div v-if="multiPreview.length" class="import-preview">
-          <div class="preview-header">
-            <span>Предпросмотр (первые 5 студентов)</span>
-          </div>
-          <div class="preview-list">
-            <div v-for="preview in multiPreview.slice(0,5)" :key="preview.studentName" class="preview-item">
-              <span class="preview-name">{{ preview.studentName }}</span>
-              <span v-for="map in preview.mappings" :key="map.csvHeader" class="preview-mapping">
-                {{ map.csvHeader }} → {{ map.finalGrade }}
-              </span>
-            </div>
-          </div>
+        <div class="header-right">
+          <div class="subject-badge">{{ subjectName }}</div>
+          <div class="group-badge">{{ groupName || 'Группа' }}</div>
+          <button class="close-btn" @click="$emit('close')">✕</button>
         </div>
       </div>
 
-      <div v-if="importMessage" class="import-message" :class="importMessageType">{{ importMessage }}</div>
-    </div>
+      <div class="import-panel">
+        <div class="import-controls">
+          <button class="sample-btn" @click="downloadSampleCSV">Пример CSV</button>
+          <label class="import-file-btn">
+            Загрузить CSV
+            <input type="file" accept=".csv" @change="handleFileUpload" style="display: none" ref="fileInput" />
+          </label>
+          <button class="scale-settings-btn" @click.stop="openScalePopup($event)">⚙ Шкала и веса</button>
+          <button v-if="!importModeActive" class="switch-mode-btn" @click="activateImportMode">➕ Импорт нескольких
+            тестов</button>
+          <button v-else class="switch-mode-btn" @click="cancelMultiImport">✕ Отменить импорт</button>
+          <div class="attendance-filter">
+            <span class="filter-label">Мин. посещений:</span>
+            <input
+              type="number"
+              class="filter-input"
+              v-model.number="minAttendanceFilter"
+              min="0"
+              :max="dates.length"
+              placeholder="0"
+            />
+            <button v-if="minAttendanceFilter > 0" type="button" class="filter-reset" @click="minAttendanceFilter = 0">×</button>
+          </div>
+        </div>
 
-    <div class="table-scroll">
-      <table class="marks-table">
-        <thead>
-          <tr>
-            <th class="col-num">№</th>
-            <th class="col-name">ФИО</th>
-            <th class="col-stat">Ср. <span class="avg-hint">(2–5)</span></th>
-            <th class="col-stat">П.</th>
-            <th v-for="(date, dIdx) in dates" :key="date" class="date-col">
-              <div class="date-text">{{ date }}</div>
-              <div class="col-type-row">
-                <span class="type-selector" @click.stop="openTypePopup($event, dIdx)">
-                  {{ columnSettings[dIdx].type || 'Оц.' }}
-                </span>
+        <div v-if="importModeActive" class="multi-import-container">
+          <div class="mapping-table">
+            <div class="mapping-row header">
+              <div>CSV колонка</div>
+              <div>Целевая дата</div>
+              <div>Перевести в оценку (2‑5)</div>
+            </div>
+            <div v-for="(col, idx) in csvScoreColumns" :key="idx" class="mapping-row">
+              <div><strong>{{ col.header }}</strong> ({{ col.sampleValues.join(', ') }}%)</div>
+              <div><select v-model="col.targetDateIdx">
+                  <option v-for="(date, dIdx) in dates" :value="dIdx">{{ date }}</option>
+                </select></div>
+              <div><input type="checkbox" v-model="col.useGradeScale"><span class="hint">(по вашей шкале)</span></div>
+            </div>
+          </div>
+          <div class="import-actions">
+            <button @click="applyMultiImport" :disabled="!hasEnabledMappings" class="apply-import-btn">📥 Выставить
+              оценки</button>
+            <button @click="cancelMultiImport" class="cancel-import-btn">Отмена</button>
+          </div>
+          <div v-if="multiPreview.length" class="import-preview">
+            <div class="preview-header">Предпросмотр (первые 5 студентов)</div>
+            <div class="preview-list">
+              <div v-for="preview in multiPreview.slice(0, 5)" :key="preview.studentName" class="preview-item">
+                <span class="preview-name">{{ preview.studentName }}</span>
+                <span v-for="map in preview.mappings" :key="map.csvHeader" class="preview-mapping">{{ map.csvHeader }} →
+                  {{ map.finalGrade }}</span>
               </div>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(student, sIdx) in students" :key="sIdx" class="student-row">
-            <td class="col-num">{{ sIdx+1 }}</td>
-            <td class="col-name">{{ student.name }}</td>
-            <td class="col-stat">
-              <span class="avg-badge" :class="getAvgClass(student.avg)">{{ student.avg }}</span>
-            </td>
-            <td class="col-stat" :class="{ 'warn-att': student.attendance < 60 }">{{ student.attendance }}%</td>
-            <td v-for="(rec, dIdx) in student.records" :key="dIdx" class="combo-cell">
-              <div class="combo-inner">
-                <div class="combo-grade" @click.stop="editGrade(sIdx, dIdx)">
-                  <template v-for="disp in [gradeDisplayParts(rec.grade, dIdx)]" :key="dIdx + '-g'">
-                    <span class="grade-val" :class="getGradeClass(rec.grade, dIdx)">
-                      <template v-if="rec.grade === ''">—</template>
-                      <template v-else-if="rec.grade === '+' || rec.grade === '-'">{{ rec.grade }}</template>
-                      <template v-else-if="disp.showPercent">
-                        <span class="grade-raw">{{ disp.raw }}</span>
-                        <span class="grade-arrow">→</span>
-                        <span class="grade-pct">{{ disp.pct }}%</span>
-                      </template>
-                      <template v-else>{{ disp.raw ?? rec.grade }}</template>
-                    </span>
-                  </template>
+            </div>
+          </div>
+        </div>
+        <div v-if="importMessage" class="import-message" :class="importMessageType">{{ importMessage }}</div>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="marks-table">
+          <thead>
+            <tr>
+              <th class="col-num">№</th>
+              <th class="col-name">ФИО</th>
+              <th class="col-stat">Ср. <span class="avg-hint">(2–5)</span></th>
+              <th class="col-stat">П.</th>
+              <th v-for="(date, dIdx) in dates" :key="date" class="date-col">
+                <div class="date-text">{{ date }}</div>
+                <div class="type-selector" @click.stop="openTypePopup($event, dIdx)">{{
+                  getTypeLabel(columnSettings[dIdx].type) }}</div>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="({ student, sIdx }, idx) in visibleStudentEntries" :key="student.id" class="student-row">
+              <td class="col-num">{{ idx + 1 }}</td>
+              <td class="col-name">{{ student.name }}</td>
+              <td class="col-stat"><span class="avg-badge" :class="getAvgClass(student.avg)">{{ student.avg }}</span>
+              </td>
+              <td class="col-stat" :class="{ 'warn-att': student.attendance < 60 }">{{ student.attendance }}%</td>
+              <td v-for="(rec, dIdx) in student.records" :key="dIdx" class="combo-cell">
+                <div class="combo-inner">
+                  <div class="combo-grade" @click.stop="editGrade(sIdx, dIdx)">
+                    <template v-for="disp in [gradeDisplayParts(rec.grade, dIdx)]" :key="dIdx + '-g'">
+                      <span class="grade-val" :class="getGradeClass(rec.grade, dIdx)">
+                        <template v-if="rec.grade === ''">—</template>
+                        <template v-else-if="rec.grade === '+' || rec.grade === '-'">{{ rec.grade }}</template>
+                        <template v-else-if="disp.showPercent">
+                          <span class="grade-raw">{{ disp.raw }}</span>
+                          <span class="grade-arrow">→</span>
+                          <span class="grade-pct">{{ disp.pct }}%</span>
+                        </template>
+                        <template v-else>{{ disp.raw ?? rec.grade }}</template>
+                      </span>
+                    </template>
+                  </div>
+                  <div
+                    class="combo-presence"
+                    :class="rec.present ? 'pres-yes' : 'pres-no'"
+                    @click.stop="togglePresence(sIdx, dIdx)"
+                    :title="rec.present ? 'Отметить отсутствие' : 'Отметить присутствие'"
+                  >
+                    <span class="presence-icon">{{ rec.present ? '✓' : '✗' }}</span>
+                  </div>
+                  <div
+                    class="combo-comment"
+                    :class="{ 'has-comment': rec.comment }"
+                    @click.stop="editComment(sIdx, dIdx)"
+                    :title="rec.comment || 'Добавить комментарий'"
+                  >💬</div>
                 </div>
-                <div class="combo-presence" 
-                     :class="rec.present ? 'pres-yes' : 'pres-no'"
-                     @click.stop="togglePresence(sIdx, dIdx)"
-                     :title="rec.present ? 'Отметить отсутствие' : 'Отметить присутствие'">
-                  {{ rec.present ? '✓' : '✗' }}
-                </div>
-                <div
-                  class="combo-comment"
-                  :class="{ 'has-comment': rec.comment }"
-                  @click.stop="editComment(sIdx, dIdx)"
-                  :title="rec.comment || 'Добавить комментарий'"
-                >
-                  💬
-                </div>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="legend-row">
+        <span class="legend-item"><span class="leg-dot pres-dot"></span>Присутствовал</span>
+        <span class="legend-item"><span class="leg-dot abs-dot"></span>Отсутствовал</span>
+        <span class="legend-sep">|</span>
+        <span class="legend-item">Оценка · посещение · 💬 комментарий</span>
+      </div>
     </div>
 
-    <div class="legend-row">
-      <span class="legend-item"><span class="leg-dot pres-dot"></span>Присутствовал</span>
-      <span class="legend-item"><span class="leg-dot abs-dot"></span>Отсутствовал</span>
-      <span class="legend-sep">|</span>
-      <span class="legend-item">Оценка | посещение | 💬 комментарий</span>
-    </div>
-
-    <!-- Popup для выбора типа колонки -->
     <Teleport to="body">
       <Transition name="popup-fade">
-        <div v-if="popup.visible" class="type-popup" :style="{ top: popup.y+'px', left: popup.x+'px' }">
-          <div class="popup-label">Тип колонки</div>
+        <div v-if="popup.visible" class="type-popup" :style="{ top: popup.y + 'px', left: popup.x + 'px' }">
+          <div class="popup-label">Тип работы</div>
           <div class="popup-grid">
             <button class="popup-btn kr" @click="setType('КР')">КР</button>
             <button class="popup-btn dop" @click="setType('ДОП')">ДОП</button>
             <button class="popup-btn dz" @click="setType('ДЗ')">ДЗ</button>
-            <button class="popup-btn dash" @click="setType('±')">±</button>
+            <button class="popup-btn dash" @click="setType('±')">+ / -</button>
           </div>
         </div>
       </Transition>
     </Teleport>
 
-    <!-- Popup для настройки шкалы -->
     <Teleport to="body">
       <Transition name="popup-fade">
-        <div v-if="scalePopup.visible" class="type-popup scale-popup" :style="{ top: scalePopup.y+'px', left: scalePopup.x+'px' }" @click.stop>
-          <div class="popup-label">Настройка шкалы</div>
+        <div v-if="scalePopup.visible" class="scale-popup" @click.stop>
+          <div class="popup-label scale-title">Настройка шкалы</div>
           <div class="scale-inputs">
-            <div class="scale-section-title">Шкала баллов → оценка (2–5)</div>
-            <div class="scale-row">
-              <span class="grade-label">Оценка 2:</span>
-              от <input type="number" v-model.number="gradeScale.from2" step="1" class="scale-input" />
-              до <input type="number" v-model.number="gradeScale.to2" step="1" class="scale-input" />
+            <div class="scale-row"><span class="grade-label">Оценка 2:</span>
+              <div class="custom-number"><button class="num-btn dec"
+                  @click="gradeScale.from2 = Math.max(0, gradeScale.from2 - 1)">−</button><input type="number"
+                  v-model.number="gradeScale.from2" step="1" class="scale-input"><button class="num-btn inc"
+                  @click="gradeScale.from2 = Math.min(gradeScale.to2 - 1, gradeScale.from2 + 1)">+</button></div>
+              <div class="custom-number"><button class="num-btn dec"
+                  @click="gradeScale.to2 = Math.max(gradeScale.from2 + 1, gradeScale.to2 - 1)">−</button><input
+                  type="number" v-model.number="gradeScale.to2" step="1" class="scale-input"><button class="num-btn inc"
+                  @click="gradeScale.to2 = Math.min(gradeScale.from3 - 1, gradeScale.to2 + 1)">+</button></div>
             </div>
-            <div class="scale-row">
-              <span class="grade-label">Оценка 3:</span>
-              от <input type="number" v-model.number="gradeScale.from3" step="1" class="scale-input" />
-              до <input type="number" v-model.number="gradeScale.to3" step="1" class="scale-input" />
+            <div class="scale-row"><span class="grade-label">Оценка 3:</span>
+              <div class="custom-number"><button class="num-btn dec"
+                  @click="gradeScale.from3 = Math.max(gradeScale.to2 + 1, gradeScale.from3 - 1)">−</button><input
+                  type="number" v-model.number="gradeScale.from3" step="1" class="scale-input"><button
+                  class="num-btn inc"
+                  @click="gradeScale.from3 = Math.min(gradeScale.to3 - 1, gradeScale.from3 + 1)">+</button></div>
+              <div class="custom-number"><button class="num-btn dec"
+                  @click="gradeScale.to3 = Math.max(gradeScale.from3 + 1, gradeScale.to3 - 1)">−</button><input
+                  type="number" v-model.number="gradeScale.to3" step="1" class="scale-input"><button class="num-btn inc"
+                  @click="gradeScale.to3 = Math.min(gradeScale.from4 - 1, gradeScale.to3 + 1)">+</button></div>
             </div>
-            <div class="scale-row">
-              <span class="grade-label">Оценка 4:</span>
-              от <input type="number" v-model.number="gradeScale.from4" step="1" class="scale-input" />
-              до <input type="number" v-model.number="gradeScale.to4" step="1" class="scale-input" />
+            <div class="scale-row"><span class="grade-label">Оценка 4:</span>
+              <div class="custom-number"><button class="num-btn dec"
+                  @click="gradeScale.from4 = Math.max(gradeScale.to3 + 1, gradeScale.from4 - 1)">−</button><input
+                  type="number" v-model.number="gradeScale.from4" step="1" class="scale-input"><button
+                  class="num-btn inc"
+                  @click="gradeScale.from4 = Math.min(gradeScale.to4 - 1, gradeScale.from4 + 1)">+</button></div>
+              <div class="custom-number"><button class="num-btn dec"
+                  @click="gradeScale.to4 = Math.max(gradeScale.from4 + 1, gradeScale.to4 - 1)">−</button><input
+                  type="number" v-model.number="gradeScale.to4" step="1" class="scale-input"><button class="num-btn inc"
+                  @click="gradeScale.to4 = Math.min(gradeScale.from5 - 1, gradeScale.to4 + 1)">+</button></div>
             </div>
-            <div class="scale-row">
-              <span class="grade-label">Оценка 5:</span>
-              от <input type="number" v-model.number="gradeScale.from5" step="1" class="scale-input" />
-              до <input type="number" v-model.number="gradeScale.to5" step="1" class="scale-input" />
+            <div class="scale-row"><span class="grade-label">Оценка 5:</span>
+              <div class="custom-number"><button class="num-btn dec"
+                  @click="gradeScale.from5 = Math.max(gradeScale.to4 + 1, gradeScale.from5 - 1)">−</button><input
+                  type="number" v-model.number="gradeScale.from5" step="1" class="scale-input"><button
+                  class="num-btn inc"
+                  @click="gradeScale.from5 = Math.min(gradeScale.to5 - 1, gradeScale.from5 + 1)">+</button></div>
+              <div class="custom-number"><button class="num-btn dec"
+                  @click="gradeScale.to5 = Math.max(gradeScale.from5 + 1, gradeScale.to5 - 1)">−</button><input
+                  type="number" v-model.number="gradeScale.to5" step="1" class="scale-input"><button class="num-btn inc"
+                  @click="gradeScale.to5 = Math.min(100, gradeScale.to5 + 1)">+</button></div>
             </div>
             <div class="scale-section-title">Весовые коэффициенты</div>
             <div v-for="cat in categoryWeights" :key="cat.code" class="scale-row">
               <span class="grade-label">{{ cat.name }}:</span>
-              вес <input type="number" v-model.number="cat.weight" step="0.1" min="0.01" class="scale-input" />
+              <div class="custom-number">
+                <span class="hint">вес</span>
+                <input type="number" v-model.number="cat.weight" step="0.1" min="0.01" class="scale-input" />
+              </div>
             </div>
           </div>
-          <div class="scale-actions">
-            <button class="popup-btn large-btn" @click="closeScalePopup">Применить</button>
-          </div>
+          <div class="scale-actions"><button class="large-btn" @click="closeScalePopup">Применить</button></div>
         </div>
       </Transition>
     </Teleport>
@@ -194,19 +221,16 @@
           <div class="grade-popup">
             <div class="grade-popup-name">{{ gradeInput.studentName }}</div>
             <div class="grade-popup-sub">{{ gradeInput.typeName }}</div>
-            <input ref="gradeInputRef" v-model="gradeInput.value" class="grade-field"
-                   type="number" min="0" placeholder="Баллы"
-                   @keyup.enter="confirmGrade" @keyup.esc="gradeInput.visible=false" />
-            <div class="grade-actions">
-              <button class="btn-cancel" @click="gradeInput.visible=false">Отмена</button>
-              <button class="btn-ok" @click="confirmGrade">Сохранить</button>
-            </div>
+            <input ref="gradeInputRef" v-model="gradeInput.value" class="grade-field" type="number" min="0"
+              placeholder="Баллы" @keyup.enter="confirmGrade" @keyup.esc="gradeInput.visible = false">
+            <div class="grade-actions"><button class="btn-cancel"
+                @click="gradeInput.visible = false">Отмена</button><button class="btn-ok"
+                @click="confirmGrade">Сохранить</button></div>
           </div>
         </div>
       </Transition>
     </Teleport>
 
-    <!-- Модалка для комментария -->
     <Teleport to="body">
       <Transition name="fade-scale">
         <div v-if="commentInput.visible" class="grade-overlay" @click.self="commentInput.visible = false">
@@ -231,7 +255,6 @@
     </Teleport>
   </div>
 </template>
-
 <script setup>
 import { ref, nextTick, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { getStudents, getGrades, getAttendance, getLessonComments, saveGrade, saveAttendance, saveLessonComment, bulkSaveGrades, getGradeScale, saveGradeScale, getGradeCategories, saveGradeCategories, getGradeColumns, saveGradeColumns, normalizeDate } from '@/services/marks'
@@ -248,6 +271,15 @@ const dates = ['21/04', '28/04', '5/05', '12/05', '19/05']
 const columnSettings = ref(dates.map(() => ({ type: null, categoryCode: null })))
 const students = ref([])
 const studentsMap = ref(new Map())
+const minAttendanceFilter = ref(0)
+
+const visibleStudentEntries = computed(() =>
+  students.value
+    .map((student, sIdx) => ({ student, sIdx }))
+    .filter(({ student }) =>
+      !minAttendanceFilter.value || (student.attendanceCount ?? 0) >= minAttendanceFilter.value
+    )
+)
 
 const gradeScale = ref({
   from2: 0, to2: 40,
@@ -363,13 +395,20 @@ function recalcStudentStats() {
     student.records.forEach((rec, idx) => {
       const cfg = columnSettings.value[idx]
       const g = parseCellScore(rec.grade)
-      if (g != null && cfg?.type && cfg.type !== '±') {
+      if (cfg?.type === '±') {
+        if (rec.grade === '+') {
+          totalPercent += 1
+          hasGrades = true
+        }
+      } else if (g != null && cfg?.type) {
         totalPercent += scoreToPercent(g, cfg.categoryCode)
         hasGrades = true
       }
       if (rec.present) presentCount++
     })
 
+    student.attendanceCount = presentCount
+    student.attendancePoints = presentCount
     student.attendance = Math.round((presentCount / dates.length) * 100)
 
     if (hasGrades) {
@@ -408,6 +447,8 @@ async function loadStudents() {
       name: s.full_name,
       avg: 0,
       attendance: 0,
+      attendanceCount: 0,
+      attendancePoints: 0,
       records: dates.map(() => ({ grade: '', present: true, comment: '' }))
     }))
     
@@ -492,7 +533,12 @@ async function loadMarksFromDb() {
       const sIdx = students.value.findIndex(s => s.id === g.student_id)
       const dIdx = isoToDateIdx(g.grade_date)
       if (sIdx !== -1 && dIdx !== -1) {
-        const display = g.raw_score != null ? g.raw_score : g.grade
+        const cfg = columnSettings.value[dIdx]
+        let display = g.raw_score != null ? g.raw_score : g.grade
+        if (cfg?.type === '±') {
+          if (display === 1 || display === '1') display = '+'
+          else if (display === 0 || display === '0') display = '-'
+        }
         if (display != null) students.value[sIdx].records[dIdx].grade = display
       }
     }
@@ -722,15 +768,10 @@ function setImportMsg(msg, type) {
 watch(csvScoreColumns, () => { computeMultiPreview() }, { deep: true })
 
 // ========== Остальные методы (типы колонок, оценки, посещаемость) ==========
-const scalePopup = ref({ visible: false, x: 0, y: 0 })
+const scalePopup = ref({ visible: false })
 function openScalePopup(event) {
-  event.stopPropagation()
-  const rect = event.target.getBoundingClientRect()
-  scalePopup.value = {
-    visible: true,
-    x: Math.min(rect.left + window.scrollX - 220, window.innerWidth - 480),
-    y: rect.bottom + window.scrollY + 8
-  }
+  event?.stopPropagation?.()
+  scalePopup.value.visible = true
 }
 function closeScalePopup() {
   scalePopup.value.visible = false
@@ -759,6 +800,14 @@ const gradeInput = ref({ visible: false, sIdx: null, dIdx: null, value: '', type
 const gradeInputRef = ref(null)
 const commentInput = ref({ visible: false, sIdx: null, dIdx: null, value: '', studentName: '', dateLabel: '' })
 const commentInputRef = ref(null)
+
+function getTypeLabel(type) {
+  if (type === 'КР') return 'КР'
+  if (type === 'ДОП') return 'ДОП'
+  if (type === 'ДЗ') return 'ДЗ'
+  if (type === '±') return '+/-'
+  return 'Оц.'
+}
 
 function getAvgClass(avg) {
   if (avg === '—' || avg === '' || avg == null) return ''
@@ -814,6 +863,8 @@ async function editGrade(sIdx, dIdx) {
     const rec = students.value[sIdx].records[dIdx]
     rec.grade = rec.grade === '+' ? '-' : '+'
     recalcStudentStats()
+    const rawScore = rec.grade === '+' ? 1 : 0
+    await persistGrade(sIdx, dIdx, rawScore)
     return
   }
   gradeInput.value = {
@@ -1448,8 +1499,8 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
 }
 
 .popup-btn.kr {
-  background: #8FA4C3;
-  color: #4B618B;
+  background: #586C91;
+  color: #283347;
 }
 
 .popup-btn.dop {
@@ -1463,8 +1514,8 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
 }
 
 .popup-btn.dash {
-  background: #5C7BB4;
-  color: #CDE1FF;
+  background: #BDCFE9;
+  color: #6B83A8;
 }
 
 .popup-btn:hover {
@@ -1794,75 +1845,128 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
   background-color: #e9f0f8;
 }
 
+.avg-hint {
+  font-size: 10px;
+  font-weight: 500;
+  color: #6b8cae;
+}
+
+.att-pts {
+  display: block;
+  font-size: 10px;
+  color: #6b8cae;
+  font-weight: 500;
+}
+
+.attendance-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 20px;
+  border: 1px solid rgba(100, 160, 200, 0.45);
+}
+
+.filter-label {
+  font-size: 12px;
+  color: #1f4a6e;
+  font-weight: 500;
+}
+
+.filter-input {
+  width: 48px;
+  padding: 4px 6px;
+  border: 1px solid #b8cfdf;
+  border-radius: 8px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.filter-reset {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: #dce8f5;
+  color: #1f4a6e;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
 .grade-raw { font-weight: 700; }
+.grade-arrow { color: #6b8cae; margin: 0 2px; font-size: 11px; }
+.grade-pct { font-size: 11px; color: #2c6e9e; font-weight: 600; }
+
 .combo-comment {
   width: 28px;
-  flex-shrink: 0;
+  height: 28px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 14px;
   cursor: pointer;
-  font-size: 13px;
-  background: #b8c9df;
-  color: #3d5a7a;
-  border-left: 1px solid #5e80a1;
-  transition: background 0.15s;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(150, 180, 210, 0.5);
+  transition: 0.15s;
 }
-.legend-row {
-  display: flex;
-  gap: 20px;
-  padding: 12px 20px;
-  border-top: 1px solid #4f7098;
-  font-size: 11px;
-  color: #2c3e66;
-  background: #6882a9;
+
+.combo-comment:hover { background: #d4e3f5; }
+.combo-comment.has-comment {
+  background: #c8daf0;
+  border-color: #5f8aad;
 }
+
 .scale-section-title {
+  font-size: 12px;
   font-weight: 600;
-  margin-top: 8px;
-  margin-bottom: 4px;
-  color: #aec1df;
-  font-size: 13px;
+  color: #3d6a8c;
+  margin: 12px 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
+
 .comment-field {
   width: 100%;
-  padding: 10px 14px;
-  border: 1px solid #cfdfed;
-  border-radius: 16px;
+  padding: 10px 12px;
+  border: 1px solid #b8cfdf;
+  border-radius: 12px;
   font-size: 14px;
-  font-family: inherit;
   resize: vertical;
-  background: #f6fafe;
-  color: #1a2c44;
-  box-sizing: border-box;
+  font-family: inherit;
+  margin-bottom: 4px;
 }
-.comment-popup { width: 320px; }
-.avg-hint { font-size: 10px; font-weight: 400; opacity: 0.75; }
-.marks-wrapper {
+
+.comment-popup { min-width: 320px; }
+
+.legend-row {
   display: flex;
-  flex-direction: column;
-  max-height: 90vh;
-  background: #91a6c5;
-  border-radius: 24px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
-  font-family: system-ui, 'Inter', -apple-system, 'Segoe UI', sans-serif;
-  overflow: hidden;
-}
-.marks-header {
-  display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
   align-items: center;
-  padding: 16px 24px;
-  background: #5f7b9f66;
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid rgba(66, 107, 157, 0.5);
+  gap: 12px;
+  padding: 12px 24px 16px;
+  font-size: 12px;
+  color: #4a6080;
 }
-.table-scroll {
-  overflow: auto;
-  flex: 1;
-  margin: 20px 20px 8px;
-  border-radius: 16px;
-  border: 1px solid #5f7b9f;
-  background: #3c5b84;
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.leg-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.pres-dot { background: #5fba8a; }
+.abs-dot { background: #e58e8e; }
+
+.legend-sep {
+  color: #8aa8c4;
 }
 </style>

@@ -387,16 +387,16 @@ export default {
   box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 .grades-btn {
-  background: linear-gradient(to bottom, #8fbee6, #537ac2);
-  border: 1px solid rgba(79, 107, 200, 0.7);
-  border-radius: 25px;
-  padding: 10px 20px;
-  color: white;
+  background: linear-gradient(to bottom, #75b5f0, #2d5ca4);
+  border: 1px solid rgba(119, 155, 222, 0.7);
+  border-radius: 30px;
+  padding: 10px 18px;
+  color: #ffffff;
   font-weight: 600;
   font-size: 14px;
 }
 .grades-btn:hover {
-  background: linear-gradient(to bottom, #85b5de, #385ca0);
+  background: linear-gradient(to bottom, #66a3db, #27559b);
   transform: translateY(-1px);
 }
 .user-avatar {
