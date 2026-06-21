@@ -29,6 +29,31 @@ services:
     networks:
       - diary_network
 
+  migrate:
+    image: postgres:15
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./database:/migrations:ro
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-university_db}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-password}
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        for f in /migrations/04_grade_scaling.sql /migrations/05_grade_column_settings.sql /migrations/06_lesson_comments.sql; do
+          echo "Applying migration: $$f"
+          psql -v ON_ERROR_STOP=1 -h postgres -U $$POSTGRES_USER -d $$POSTGRES_DB -f "$$f"
+        done
+        echo "Migrations OK"
+    networks:
+      - diary_network
+    restart: "no"
+
   auth-service:
     build:
       context: .
@@ -44,6 +69,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
@@ -69,6 +96,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
@@ -94,6 +123,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
@@ -119,6 +150,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
@@ -131,8 +164,6 @@ services:
 
   gateway:
     image: nginx:alpine
-    # Не публикуем порт 80 на хост — на Windows он часто занят (IIS, Hyper-V).
-    # С компьютера API доступен через frontend: http://localhost:8080/api/...
     expose:
       - "80"
     volumes:

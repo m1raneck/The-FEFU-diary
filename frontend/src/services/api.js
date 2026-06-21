@@ -1,5 +1,3 @@
-// Относительные URL: запросы идут на тот же адрес, что и UI (например localhost:8080).
-// Frontend-контейнер проксирует /api/* на gateway внутри docker-сети.
 const API_URL = import.meta.env.VITE_API_URL ?? ''
 
 export function getToken() {
@@ -23,6 +21,13 @@ function handleUnauthorized() {
   }
 }
 
+function formatApiError(err, status) {
+  const detail = Array.isArray(err.detail)
+    ? err.detail.map(d => d.msg || JSON.stringify(d)).join('; ')
+    : (err.detail || err.message)
+  return detail || `Ошибка запроса (${status})`
+}
+
 export async function apiRequest(path, options = {}) {
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
@@ -39,7 +44,7 @@ export async function apiRequest(path, options = {}) {
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}))
-    throw new Error(err.detail || err.message || `Ошибка запроса (${response.status})`)
+    throw new Error(formatApiError(err, response.status))
   }
 
   const contentType = response.headers.get('content-type') || ''
@@ -70,7 +75,7 @@ export async function apiPublicPost(path, body) {
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}))
-    throw new Error(err.detail || err.message || `Ошибка запроса (${response.status})`)
+    throw new Error(formatApiError(err, response.status))
   }
 
   return response.json()
