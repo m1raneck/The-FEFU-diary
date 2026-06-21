@@ -1,7 +1,6 @@
 <template>
   <div class="screen-marks" :class="{ 'is-mobile': isMobile }">
     <div class="marks-card">
-      <!-- Десктопная шапка (без изменений) -->
       <div class="card-header" v-if="showHeader && !isMobile">
         <div class="header-left">
           <div class="logo-mini">UniDiary</div>
@@ -12,8 +11,6 @@
           <button class="close-btn" @click="$emit('close')">✕</button>
         </div>
       </div>
-
-      <!-- Мобильная шапка (крестик справа от логотипа, бейджи снизу) -->
       <div class="card-header card-header-mobile" v-if="showHeader && isMobile">
         <div class="header-top">
           <div class="header-left">
@@ -28,7 +25,6 @@
       </div>
 
       <div class="import-panel">
-        <!-- Десктопные кнопки (исходный вариант) -->
         <div v-if="!isMobile" class="import-controls">
           <button class="sample-btn" @click="downloadSampleCSV">Пример CSV</button>
           <div class="export-dropdown" ref="exportDropdownRef">
@@ -47,9 +43,7 @@
           <button v-else class="switch-mode-btn" @click="cancelMultiImport">✕ Отменить импорт</button>
         </div>
 
-        <!-- Мобильные кнопки: два ряда по центру -->
         <div v-if="isMobile" class="import-controls import-controls-mobile">
-          <!-- Верхний ряд -->
           <div class="mobile-import-row">
             <button class="import-btn scale-settings-btn" @click.stop="openScalePopup($event)">⚙ Шкала и веса</button>
             <div class="export-dropdown" ref="exportDropdownRef">
@@ -60,7 +54,6 @@
               </div>
             </div>
           </div>
-          <!-- Нижний ряд -->
           <div class="mobile-import-row">
             <label class="import-file-btn">
               Загрузить CSV
@@ -71,7 +64,6 @@
           </div>
         </div>
 
-        <!-- Фильтры (Мин. посещений + Поиск) -->
         <div class="filter-row">
           <div class="attendance-filter">
             <span class="filter-label">Мин. посещений:</span>
@@ -85,7 +77,6 @@
           </div>
         </div>
 
-        <!-- Блок массового импорта (без изменений) -->
         <div v-if="importModeActive" class="multi-import-container">
           <div class="mapping-table">
             <div class="mapping-row header">
@@ -119,7 +110,6 @@
         <div v-if="importMessage" class="import-message" :class="importMessageType">{{ importMessage }}</div>
       </div>
 
-      <!-- Таблица -->
       <div class="table-wrapper">
         <table class="marks-table">
           <thead>
@@ -187,7 +177,6 @@
       </div>
     </div>
 
-    <!-- Попапы и модалки -->
     <Teleport to="body">
       <Transition name="popup-fade">
         <div v-if="popup.visible" class="type-popup" :style="{ top: popup.y + 'px', left: popup.x + 'px' }">
@@ -1223,7 +1212,6 @@ function checkIfMobile() {
   box-sizing: border-box;
 }
 
-/* ========== ДЕСКТОПНАЯ ВЕРСИЯ (ИСХОДНЫЙ КОД) ========== */
 .screen-marks {
   height: 100%;
   display: flex;
@@ -2257,7 +2245,6 @@ function checkIfMobile() {
   background-color: #e9f0f8;
 }
 
-/* ========== МОБИЛЬНАЯ АДАПТАЦИЯ (ТОЛЬКО ДЛЯ .is-mobile) ========== */
 .screen-marks.is-mobile {
   background: url('@/assets/main2.PNG');
   background-size: cover;

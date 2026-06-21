@@ -100,7 +100,6 @@ export default {
   box-sizing: border-box;
 }
 
-/* Десктопный фон (исходный тёмный) */
 .screen {
   min-height: 100vh;
   width: 100%;
@@ -116,7 +115,6 @@ export default {
   padding: 2rem;
 }
 
-/* Мобильный фон – светлый, с твоей картинкой */
 .screen.is-mobile {
   background-image: url('@/assets/main2.PNG');
   background-color: #49709ac2;

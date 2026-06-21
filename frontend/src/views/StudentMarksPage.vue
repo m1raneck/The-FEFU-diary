@@ -165,7 +165,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* ========== ДЕСКТОП ========== */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -343,7 +342,7 @@ onBeforeUnmount(() => {
   opacity: 0.5;
 }
 
-/* ========== МОБИЛЬНАЯ АДАПТАЦИЯ ========== */
+
 .modal-overlay.is-mobile {
   background: url('@/assets/phone.PNG') left center / cover no-repeat;
   background-color: #6b8cae;
