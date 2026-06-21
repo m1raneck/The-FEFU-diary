@@ -3,6 +3,7 @@
     <div class="login-card">
       <div class="card-content">
         <div class="title-section">
+          <div class="screen" :class="{ 'is-mobile': isMobile }"></div>
           <div class="icon-wrapper">
             <img src="@/assets/icon.png" alt="Icon" class="icon" />
           </div>
@@ -55,11 +56,24 @@ export default {
   data() {
     return {
       form: { email: '', password: '' },
-      errors: { email: '', password: '' }
+      errors: { email: '', password: '' },
+      isMobile: false
     }
   },
+    mounted() {
+    this.checkIfMobile();
+    window.addEventListener('resize', this.checkIfMobile);
+  },
+
+  beforeDestroy() {
+    window.removeEventListener('resize', this.checkIfMobile);
+  },
   methods: {
-    validateEmail(email) {
+    
+    checkIfMobile() {
+      this.isMobile = window.innerWidth < 768;
+    
+    },validateEmail(email) {
       const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
       return re.test(email)
     },
@@ -315,5 +329,24 @@ export default {
   .form-section {
     gap: 1.5rem;
   }
+}
+.screen.is-mobile {
+  background-image: url('@/assets/main2.PNG');
+  background-color: #49709ac2;
+  background-blend-mode: overlay;
+  background-position: left center;
+  position: relative;
+}
+.screen.is-mobile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.1) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+.screen.is-mobile > * {
+  position: relative;
+  z-index: 1;
 }
 </style>

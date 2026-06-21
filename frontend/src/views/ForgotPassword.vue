@@ -2,6 +2,7 @@
   <div class="screen">
     <div class="login-card">
       <div class="card-content">
+        <div class="screen" :class="{ 'is-mobile': isMobile }"></div>
         <div class="title-section">
           <div class="icon-wrapper">
             <img src="@/assets/icon.png" alt="Icon" class="icon" />
@@ -43,10 +44,21 @@ export default {
     return {
       email: '',
       error: '',
-      loading: false
+      loading: false,
+      isMobile: false
     }
   },
+  mounted() {
+    this.checkIfMobile();
+    window.addEventListener('resize', this.checkIfMobile);
+  },
+  beforeDestroy() {
+    window.removeEventListener('resize', this.checkIfMobile);
+  },
   methods: {
+    checkIfMobile() {
+    this.isMobile = window.innerWidth < 768;
+  },
     validateEmail(email) {
       const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
       return re.test(email)
@@ -318,5 +330,25 @@ export default {
   .form-section {
     gap: 2rem;
   }
+}
+/* ========== МОБИЛЬНАЯ АДАПТАЦИЯ ========== */
+.screen.is-mobile {
+  background-image: url('@/assets/main2.PNG');
+  background-color: #49709ac2;
+  background-blend-mode: overlay;
+  background-position: left center;
+  position: relative;
+}
+.screen.is-mobile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.1) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+.screen.is-mobile > * {
+  position: relative;
+  z-index: 1;
 }
 </style>

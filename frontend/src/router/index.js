@@ -3,7 +3,7 @@ import LoginPage from '@/views/LoginPage.vue'
 import ForgotPassword from '@/views/ForgotPassword.vue'
 import SchedulePage from '@/views/SchedulePage.vue'
 import StudentGradesPage from '@/views/StudentGradesPage.vue'
-import TeacherGradesPage from '@/views/TeacherGradesPage.vue'
+import AllGradesPage from '@/views/AllGradesPage.vue'
 import { getStoredUser, isStudent, isTeacher } from '@/services/auth'
 
 const routes = [
@@ -31,7 +31,7 @@ const routes = [
   {
     path: '/all-grades',
     name: 'AllGrades',
-    component: TeacherGradesPage,
+    component: AllGradesPage,
     meta: { requiresAuth: true, teacherOnly: true }
   }
 ]

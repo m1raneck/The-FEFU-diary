@@ -2,6 +2,7 @@
   <div class="screen">
     <div class="grades-card">
       <div class="card-header">
+        <div class="screen" :class="{ 'is-mobile': isMobile }"></div>
         <div class="header-left">
           <router-link to="/" class="logo-link">
             <img src="@/assets/icon.png" alt="Logo" class="logo-icon" />
@@ -31,9 +32,8 @@
       <div v-else class="subjects-list">
         <div v-for="subj in subjects" :key="subj.scheduleId" class="subject-card">
           <div class="subject-header">
-            <h2>{{ subj.name }}</h2>
-            <span v-if="subj.room" class="room-badge">Ауд. {{ subj.room }}</span>
-          </div>
+  <h2>{{ subj.name }}</h2>
+</div>
           <div class="table-wrapper">
             <table class="grades-table">
               <thead>
@@ -80,7 +80,8 @@ export default {
       user: getStoredUser(),
       loading: true,
       error: '',
-      subjects: []
+      subjects: [],
+      isMobile: false
     }
   },
   computed: {
@@ -90,6 +91,8 @@ export default {
     }
   },
   async mounted() {
+    this.checkIfMobile();
+  window.addEventListener('resize', this.checkIfMobile);
     if (!isStudent(this.user)) {
       this.$router.replace('/schedule')
       return
@@ -103,7 +106,13 @@ export default {
       this.loading = false
     }
   },
+  beforeDestroy() {
+  window.removeEventListener('resize', this.checkIfMobile);
+},
   methods: {
+    checkIfMobile() {
+    this.isMobile = window.innerWidth < 768;
+  },
     gradeChipClass(grade) {
       if (grade === '+') return 'chip-plus'
       if (grade === '-') return 'chip-minus'
@@ -453,5 +462,71 @@ export default {
 @media (max-width: 560px) {
   .subjects-list { padding: 0 1rem 1rem; }
   .page-title { font-size: 22px; }
+}
+.screen.is-mobile {
+  background: url('@/assets/phone2.PNG');
+  background-color: #8fa0d4;
+  position: relative;
+  overflow: hidden;
+}
+.screen.is-mobile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.1) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+.screen.is-mobile > * {
+  position: relative;
+  z-index: 1;
+}
+.screen.is-mobile .grades-card {
+  height: calc(100vh - 1rem);
+  overflow-y: auto;
+  border-radius: 32px;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(12px);
+  border: none;
+  box-shadow: none;
+}
+.screen.is-mobile .card-header {
+  flex-direction: row !important;
+  justify-content: space-between;
+  padding: 0.8rem 1rem;
+  border-bottom: none;
+}
+.screen.is-mobile .header-right {
+  gap: 6px;
+}
+.screen.is-mobile .user-avatar {
+  display: none;
+}
+.screen.is-mobile .schedule-btn,
+.screen.is-mobile .logout-btn {
+  padding: 5px 12px;
+  font-size: 12px;
+  border-radius: 20px;
+}
+.screen.is-mobile .page-title {
+  font-size: 22px;
+}
+.screen.is-mobile .subjects-list {
+  padding: 0 1rem 1rem;
+}
+.screen.is-mobile .grades-table th,
+.screen.is-mobile .grades-table td {
+  padding: 6px 4px;
+  font-size: 12px;
+}
+.screen.is-mobile .grade-chip,
+.screen.is-mobile .attendance-chip {
+  padding: 3px 10px;
+  font-size: 12px;
+  min-width: 40px;
+}
+.screen.is-mobile .card-footer {
+  font-size: 12px;
+  gap: 12px;
 }
 </style>

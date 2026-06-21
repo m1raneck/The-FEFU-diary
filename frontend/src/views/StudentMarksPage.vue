@@ -1,5 +1,5 @@
 <template>
-  <div class="modal-overlay" @click.self="$emit('close')">
+  <div class="modal-overlay" :class="{ 'is-mobile': isMobile }" @click.self="$emit('close')">
     <div class="marks-card">
       <div class="card-header">
         <div class="subject-badge">{{ subjectName }}</div>
@@ -13,25 +13,23 @@
       <div v-else class="table-container">
         <table class="marks-table">
           <thead>
-            <tr>
-              <th>Дата</th>
-              <th>Оценка</th>
-              <th>Посещение</th>
-              <th>Комментарий</th>
-            </tr>
-          </thead>
+  <tr>
+    <th>Дата</th>
+    <th class="col-center">Оценка</th>
+    <th class="col-center">Посещение</th>
+    <th>Комментарий</th>
+  </tr>
+</thead>
           <tbody>
             <tr v-for="row in rows" :key="row.date">
-              <td class="date-cell">{{ row.dateLabel }}</td>
-              <td class="grade-cell">
-                <span class="grade-value" :class="gradeClass(row.grade)">{{ row.grade ?? '—' }}</span>
-              </td>
-              <td class="attendance-cell">
-                <span class="attendance-icon" :class="row.present === true ? 'present' : (row.present === false ? 'absent' : '')">
-                  {{ row.present === true ? '✓' : (row.present === false ? '✗' : '—') }}
-                </span>
-              </td>
-              <td class="comment-cell">{{ row.comment || '—' }}</td>
+              <td class="grade-cell col-center">
+  <span v-if="!isMobile" class="grade-value" :class="gradeClass(row.grade)">{{ row.grade ?? '—' }}</span>
+  <span v-else class="grade-chip" :class="gradeChipClass(row.grade)">{{ formatGrade(row.grade) }}</span>
+</td>
+<td class="attendance-cell col-center">
+  <span v-if="!isMobile" class="attendance-icon" :class="row.present === true ? 'present' : (row.present === false ? 'absent' : '')">{{ row.present === true ? '✓' : (row.present === false ? '✗' : '—') }}</span>
+  <span v-else class="attendance-chip" :class="attendanceChipClass(row.present)">{{ attendanceText(row.present) }}</span>
+</td>
             </tr>
           </tbody>
         </table>
@@ -47,7 +45,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { getGrades, getAttendance, getLessonComments, normalizeDate } from '@/services/marks'
 
 const props = defineProps({
@@ -55,7 +53,7 @@ const props = defineProps({
   scheduleId: { type: Number, required: true }
 })
 defineEmits(['close'])
-
+const isMobile = ref(false)
 const loading = ref(true)
 const error = ref('')
 const rows = ref([])
@@ -81,6 +79,10 @@ function gradeClass(grade) {
   if (grade >= 4) return 'good'
   if (grade >= 3) return 'mid'
   return 'low'
+}
+
+function checkIfMobile() {
+  isMobile.value = window.innerWidth < 768
 }
 
 function formatDate(iso) {
@@ -122,8 +124,39 @@ async function load() {
     loading.value = false
   }
 }
+function gradeChipClass(grade) {
+  if (grade === '+') return 'chip-plus'
+  if (grade === '-') return 'chip-minus'
+  const num = parseFloat(grade)
+  if (!isNaN(num)) {
+    if (num >= 4) return 'chip-good'
+    return 'chip-bad'
+  }
+  return 'chip-empty'
+}
+function formatGrade(grade) {
+  if (grade === '+') return '+'
+  if (grade === '-') return '−'
+  if (grade == null) return '—'
+  return grade
+}
+function attendanceChipClass(present) {
+  if (present === null) return ''
+  return present ? 'chip-present' : 'chip-absent'
+}
+function attendanceText(present) {
+  if (present === null) return '—'
+  return present ? '✓' : '✗'
+}
+onMounted(() => {
+  checkIfMobile()
+  window.addEventListener('resize', checkIfMobile)
+})
 
-onMounted(load)
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', checkIfMobile)
+})
+
 </script>
 
 <style scoped>
@@ -266,6 +299,70 @@ onMounted(load)
 }
 
 .divider {
-  color: #8aa8c4;
+  color:
+   #8aa8c4;
+}
+/* ===== Мобильная адаптация StudentMarksPage ===== */
+.modal-overlay.is-mobile {
+  background: url('@/assets/phone.PNG') left center / cover no-repeat;
+  background-color: #6b8cae;
+  background-blend-mode: lighten;
+  padding: 0.5rem;
+}
+.modal-overlay.is-mobile .marks-card {
+  max-width: 100%;
+  max-height: 55vh;
+  border-radius: 24px;
+  background: rgba(243, 247, 255, 0.55);
+  backdrop-filter: blur(12px);
+  border: none;
+  box-shadow: none;
+}
+.modal-overlay.is-mobile .card-header {
+  padding: 0.6rem 0.8rem;
+  border-bottom: none;
+}
+.modal-overlay.is-mobile .subject-badge {
+  font-size: 14px;
+  padding: 5px 14px;
+  border-radius: 20px;
+}
+.modal-overlay.is-mobile .close-btn {
+  width: 30px;
+  height: 30px;
+  font-size: 16px;
+}
+.modal-overlay.is-mobile .table-container {
+  padding: 0.3rem;
+  margin: 0 0.3rem 0.3rem;
+  border-radius: 12px;
+}
+.modal-overlay.is-mobile .marks-table {
+  table-layout: fixed;
+}
+.modal-overlay.is-mobile .marks-table th,
+.modal-overlay.is-mobile .marks-table td {
+  padding: 5px 4px;
+  font-size: 10px;
+}
+.grade-chip,
+.attendance-chip {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 40px;
+  font-weight: 600;
+  font-size: 10px;
+  min-width: 40px;
+  text-align: center;
+}
+.chip-good, .chip-plus { background: #8bc9a5; color: #1d4d2d; }
+.chip-bad, .chip-minus { background: #e8b0b0; color: #a14242; }
+.chip-empty { background: #b8cfe8; color: #2c4e6e; }
+.chip-present { background: #8bc9a5; color: #1d4d2d; font-size: 13px; padding: 2px 8px; }
+.chip-absent { background: #e8b0b0; color: #a14242; font-size: 13px; padding: 2px 8px; }
+.modal-overlay.is-mobile .card-footer {
+  padding: 0.5rem 0.8rem;
+  font-size: 12px;
+  gap: 8px;
 }
 </style>
