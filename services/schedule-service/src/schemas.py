@@ -111,3 +111,22 @@ class GroupBase(BaseModel):
     year: int
 
 
+class LessonCommentBase(BaseModel):
+    student_id: int
+    schedule_id: int
+    comment: str = ""
+
+
+class LessonCommentCreate(LessonCommentBase):
+    lesson_date: Optional[date] = None
+
+
+class LessonCommentResponse(LessonCommentBase):
+    id: int
+    lesson_date: date
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+

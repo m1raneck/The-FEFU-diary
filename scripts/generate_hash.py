@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Генерация bcrypt-хеша пароля для вставки в SQL или отладки auth-service."""
+
 from passlib.context import CryptContext
 import sys
 
@@ -9,5 +11,4 @@ if len(sys.argv) > 1:
 else:
     password = input("Enter password to hash: ")
 
-hashed = pwd_context.hash(password)
-print(hashed)
+print(pwd_context.hash(password))

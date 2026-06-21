@@ -85,7 +85,7 @@ class AttendanceBase(BaseModel):
     comment: Optional[str] = None
 
 class AttendanceCreate(AttendanceBase):
-    pass
+    record_date: Optional[date] = None
 
 class AttendanceResponse(AttendanceBase):
     id: int

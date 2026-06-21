@@ -1,44 +1,49 @@
 <template>
-  <div class="login-page">
-    <div class="background-overlay"></div>
-    
+  <div class="screen">
     <div class="login-card">
-      <div class="avatar"></div>
-      
-      <h1 class="diary-title">Дневник</h1>
-      <div class="divider"></div>
-      <h2 class="login-title">Восстановление пароля</h2>
-      
-      <form @submit.prevent="handleReset" class="login-form">
-        <div class="input-group">
-          <input 
-            id="email"
-            v-model="email"
-            type="email"
-            placeholder="Введите почту"
-            :class="{ 'error': error }"
-            @input="error = ''"
-          />
-          <span v-if="error" class="error-message">{{ error }}</span>
+      <div class="card-content">
+        <div class="title-section">
+          <div class="icon-wrapper">
+            <img src="@/assets/icon.png" alt="Icon" class="icon" />
+          </div>
+          <div class="logo">
+            <div class="logo-main">UniDiary</div>
+            <div class="logo-sub">ЭЛЕКТРОННЫЙ ДНЕВНИК</div>
+          </div>
+          <div class="line"></div>
         </div>
-        
-        <button type="submit" class="login-button">Отправить ссылку</button>
-        
-        <div class="divider-bottom"></div>
-        
-        <a href="#" class="back-link" @click.prevent="goBack">← Вернуться ко входу</a>
-      </form>
+
+        <form @submit.prevent="handleReset" class="form-section">
+          <div class="input-field">
+            <label class="field-label">Email</label>
+            <input
+              v-model="email"
+              type="email"
+              placeholder="example@mail.com"
+              :class="{ 'error': error }"
+              @input="error = ''"
+            />
+            <span v-if="error" class="error-message">{{ error }}</span>
+          </div>
+          <div class="info-text">На указанную почту<br> придёт ссылка для восстановления пароля</div>
+          <button type="submit" class="reset-button" :disabled="loading">Отправить ссылку</button>
+          <a href="#" class="back-link" @click.prevent="goBack">← Вернуться ко входу</a>
+        </form>
+      </div>
     </div>
   </div>
 </template>
 
 <script>
+import { requestPasswordReset } from "@/services/auth";
+
 export default {
   name: 'ForgotPassword',
   data() {
     return {
       email: '',
-      error: ''
+      error: '',
+      loading: false
     }
   },
   methods: {
@@ -46,28 +51,30 @@ export default {
       const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
       return re.test(email)
     },
-    
-    handleReset() {
+    async handleReset() {
       if (!this.email) {
         this.error = 'Пожалуйста, введите почту'
         return
       }
-      
       if (!this.validateEmail(this.email)) {
         this.error = 'Введите корректный email'
         return
       }
-      
-      // здесь должен быть запрос на сервер
-      console.log('Сброс пароля для:', this.email)
-      alert(`Ссылка для восстановления пароля отправлена на ${this.email}`)
-      
-      // через 2 секунды возвращается на страницу входа
-      setTimeout(() => {
-        this.$router.push('/')
-      }, 2000)
+
+      this.loading = true
+      this.error = ''
+      try {
+        await requestPasswordReset(this.email)
+        alert(`Ссылка для восстановления пароля отправлена на ${this.email}`)
+        setTimeout(() => {
+          this.$router.push('/')
+        }, 2000)
+      } catch (err) {
+        this.error = err.message || 'Ошибка отправки. Попробуйте позже.'
+      } finally {
+        this.loading = false
+      }
     },
-    
     goBack() {
       this.$router.push('/')
     }
@@ -76,235 +83,240 @@ export default {
 </script>
 
 <style scoped>
+/* Все стили сохранены без изменений */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-.login-page {
+.screen {
   min-height: 100vh;
   width: 100%;
-  background: linear-gradient(63deg, rgba(15, 80, 110, 0.2) 17%, rgba(153, 191, 230, 0.2) 65%),
-              linear-gradient(0deg, #465C73 0%, #465C73 100%);
+  background-image: url('@/assets/image.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: #919ba4;
+  background-blend-mode: overlay;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
-  position: relative;
+  padding: 2rem;
 }
 
 .login-card {
-  position: relative;
   width: 100%;
-  max-width: 491px;
-  background: linear-gradient(145deg, rgba(193, 200, 206, 0.9) 31%, 
-              rgba(183, 192, 200, 0.9) 47%, 
-              rgba(139, 153, 171, 0.9) 100%);
-  border: 2px solid rgba(255, 255, 255, 0.78);
-  border-radius: 30px;
-  box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
-  padding: 2rem 2rem 3rem;
+  max-width: 560px;
+  backdrop-filter: blur(6px) brightness(110%);
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.55) 22%,
+    rgba(188, 207, 226, 0.35) 79%,
+    rgba(149, 169, 195, 0.55) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 38px;
+  box-shadow: 0px 12px 28px rgba(0, 0, 0, 0.25);
+  padding: 3rem 3rem 3.2rem;
 }
 
-.avatar {
-  width: 52px;
-  height: 52px;
-  background-color: #667593;
-  border-radius: 50%;
-  box-shadow: inset 0px 4px 4px rgba(0, 0, 0, 0.25);
-  position: absolute;
-  margin-top: 1.2rem;
-  left: 6rem;
+.card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
 }
 
-.diary-title {
-  font-family: system-ui, 'Inter', -apple-system, sans-serif;
+.title-section {
+  text-align: center;
+  margin-bottom: 0.25rem;
+}
+
+.icon-wrapper {
+  text-align: center;
+  margin-bottom: 12px;
+}
+.icon {
+  width: 80px;
+  height: auto;
+  object-fit: contain;
+}
+
+.logo {
+  margin-bottom: 16px;
+}
+.logo-main {
+  color: #2c3e4f;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 46px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+.logo-sub {
+  color: #4a5a7a;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 13px;
   font-weight: 500;
-  font-size: clamp(24px, 5vw, 32px);
-  color: #38445E;
-  text-align: center;
-  margin-top: 1.5rem;
-  margin-bottom: 1rem;
+  letter-spacing: 1.5px;
+  margin-top: 6px;
+  text-transform: uppercase;
 }
 
-.divider {
-  height: 1px;
-  background: linear-gradient(to right, transparent, #899bbf, transparent);
-  width: 100%;
-  margin-bottom: 1rem;
-  margin-top: 0.5rem;
-  opacity: 0.5;
+.line {
+  height: 2px;
+  background: #566697;
+  width: 60%;
+  margin: 0 auto;
+  opacity: 0.4;
 }
 
-.login-title {
-  font-family: system-ui, 'Inter', -apple-system, sans-serif;
-  font-weight: 400;
-  font-size: clamp(16px, 5vw, 24px);
-  color: #38445E;
-  text-align: center;
-  margin-top: 0.5rem;
-  margin-bottom: 2rem;
-}
-
-.login-form {
+.form-section {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 5rem;
 }
 
-.input-group {
+.input-field {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 2rem;
+  gap: 10px;
 }
 
-.input-group input {
-  width: 100%;
-  padding: 1rem;
+.field-label {
+  color: #ffffff;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   font-size: 16px;
-  font-family: system-ui, 'Inter', -apple-system, sans-serif;
-  background-color: #e6e6e6;
-  border: 2px solid transparent;
-  border-radius: 10px;
-  transition: all 0.3s ease;
+  font-weight: 600;
+  margin-left: 0.5rem;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.input-field input {
+  background-color: rgba(255, 255, 255, 0.35);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 44px;
+  padding: 16px 24px;
+  font-size: 16px;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: #395d97;
   outline: none;
+  transition: all 0.25s ease;
+  width: 100%;
 }
 
-.input-group input:focus {
-  border-color: #667593;
-  background-color: #fff;
-  box-shadow: 0 0 0 3px rgba(102, 117, 147, 0.2);
+.input-field input::placeholder {
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
 }
 
-.input-group input.error {
-  border-color: #dc3545;
-  background-color: #fff8f8;
+.input-field input:focus {
+  border-color: #6f8bc0;
+  background-color: rgba(255, 255, 255, 0.55);
+}
+
+.input-field input.error {
+  border-color: #806cc4;
+  background-color: rgba(163, 107, 203, 0.2);
+  box-shadow: 0 0 0 3px rgba(242, 194, 214, 0.1);
 }
 
 .error-message {
-  color: #dc3545;
-  font-family: system-ui, 'Inter', -apple-system, sans-serif;
-  font-size: 14px;
-  margin-top: -0.25rem;
+  color: #653897;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 12px;
+  margin-left: 0.75rem;
+  font-weight: 500;
 }
 
-.login-button {
-  background-color: #667593;
+.info-text {
   color: #ffffff;
-  font-family: system-ui, 'Inter', -apple-system, sans-serif;
-  font-weight: 750;
-  font-size: 20px;
-  height: 70px;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  margin-top: 5rem;
-}
-
-.login-button:hover {
-  background-color: #4a5a73;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-}
-
-.login-button:active {
-  transform: translateY(0);
-}
-
-.divider-bottom {
-  height: 1px;
-  background: linear-gradient(to right, transparent, #505e7b, transparent);
-  width: 100%;
-  margin-top: 1rem;
-  margin-bottom: 0.5rem;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  text-align: center;
+  margin: 0;
   opacity: 0.5;
+  letter-spacing: 0.2px;
+  margin-bottom: -3.5rem; 
+}
+
+.reset-button {
+  background-color: #283347;
+  border-radius: 44px;
+  box-shadow: 0px 6px 12px rgba(0, 0, 0, 0.3);
+  border: none;
+  color: #f0f5fc;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  padding: 24px 20px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  width: 100%;
+  margin-top: 0;
+}
+
+.reset-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.reset-button:hover:not(:disabled) {
+  background-color: #1c253b;
+  transform: translateY(-3px);
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.35);
 }
 
 .back-link {
-  font-family: system-ui, 'Inter', -apple-system, sans-serif;
-  font-weight: 400;
-  font-size: 20px;
-  color: #000000;
+  color: #1a1f2c;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 18px;
+  font-weight: 600;
   text-align: center;
   text-decoration: none;
-  transition: all 0.3s ease;
-  margin-top: 0.1rem;
-  display: block;
+  transition: color 0.2s;
+  margin-top: 0.5rem;
+  letter-spacing: 0.3px;
 }
 
 .back-link:hover {
-  color: #667593;
-  text-decoration: underline;
+  color: #275b97;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 640px) {
+  .screen {
+    padding: 1rem;
+  }
   .login-card {
-    padding: 1.5rem;
-    max-width: 90%;
+    max-width: 92%;
+    padding: 2rem 1.5rem 2.5rem;
   }
-  
-  .login-button {
-    height: 65px;
-    font-size: 18px;
-    width: 500px;
-    margin-left: 3.5rem;
-    height: 70px;
+  .icon {
+    width: 50px;
   }
-  
+  .logo-main {
+    font-size: 34px;
+  }
+  .logo-sub {
+    font-size: 10px;
+  }
+  .reset-button {
+    font-size: 20px;
+    padding: 14px;
+  }
   .back-link {
-    font-size: 18px;
-  }
-  
-  .input-group input {
-    padding: 0.875rem;
-    width: 500px;
-    margin-left: 3.5rem;
-    height: 65px;
-  }
-  
-  .avatar {
-    width: 45px;
-    height: 44px;
-    top: 32px;
-    left: 50px;
-  }
-}
-
-@media (max-width: 560px) {
-  .login-card {
-    padding: 1.25rem;
-  }
-  
-  .login-button {
-    height: 55px;
     font-size: 16px;
   }
-  
-  .back-link {
-    font-size: 14px;
+  .info-text {
+    font-size: 12px;
+    margin-bottom: -1rem;
   }
-  
-  .input-group input {
-    padding: 0.75rem;
+  .card-content {
+    gap: 2rem;
   }
-  
-  .avatar {
-    width: 38px;
-    height: 38px;
-    top: 28px;
-    left: 35px;
-  }
-}
-
-@media (max-width: 400px) {
-  .avatar {
-    width: 32px;
-    height: 32px;
-    top: 24px;
-    left: 25px;
+  .form-section {
+    gap: 2rem;
   }
 }
 </style>

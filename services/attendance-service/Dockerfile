@@ -1,6 +1,8 @@
 FROM python:3.11-slim
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --index-url https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com -r requirements.txt
-COPY ./src ./src
+COPY services/attendance-service/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY services/shared/src/fefu_common ./fefu_common
+COPY services/attendance-service/src ./src
+ENV PYTHONPATH=/app
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]

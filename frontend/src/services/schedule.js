@@ -1,12 +1,5 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost'
+import { apiGet } from './api'
 
 export async function getSchedule() {
-  const token = localStorage.getItem('token')
-  const response = await fetch(`${API_URL}/api/schedule`, { headers: { 'Authorization': `Bearer ${token}` } })                    
-
-  if (!response.ok) {
-    throw new Error('Не удалось загрузить расписание')
-  }
-
-  return response.json()
+  return apiGet('/api/schedule')
 }
