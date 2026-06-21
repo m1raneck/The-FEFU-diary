@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-"""Генерация bcrypt-хеша пароля для вставки в SQL или отладки auth-service."""
-
 from passlib.context import CryptContext
 import sys
 
