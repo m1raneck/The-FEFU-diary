@@ -4,21 +4,28 @@
 
 ## Быстрый старт
 
+На **любом компьютере** с Docker:
+
 ```bash
+git clone https://github.com/m1raneck/The-FEFU-diary.git
 cd The-FEFU-diary
-cp config/.env.example config/.env
+cp config/.env.example config/.env   # опционально
 docker compose up --build -d
 ```
 
-- **UI:** http://localhost:8080
-- **API:** http://localhost/api
+Дождитесь, пока все контейнеры станут `healthy` (`docker compose ps`).
+
+**Открывайте только:** http://localhost:8080
+
+Тестовые учётки (пароль `123456`): см. [scripts/README.md](scripts/README.md) или seed в `database/`.
+После первого запуска можно создать свои через `scripts\test-setup.bat`.
 
 ## Структура
 
 ```
 The-FEFU-diary/
 ├── config/          # nginx, .env
-├── database/        # SQL-миграции и seed (см. database/README.md)
+├── database/        # SQL-скрипты и seed (см. database/README.md)
 ├── docs/            # документация API и схемы БД
 ├── frontend/        # Vue 3 SPA
 ├── scripts/         # утилиты для разработки (см. scripts/README.md)

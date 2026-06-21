@@ -1,4 +1,6 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost'
+// Относительные URL: запросы идут на тот же адрес, что и UI (например localhost:8080).
+// Frontend-контейнер проксирует /api/* на gateway внутри docker-сети.
+const API_URL = import.meta.env.VITE_API_URL ?? ''
 
 export function getToken() {
   return localStorage.getItem('token')
