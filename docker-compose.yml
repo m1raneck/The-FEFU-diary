@@ -1,66 +1,202 @@
+networks:
+  diary_network:
+    driver: bridge
+
 services:
-  # База данных
   postgres:
     image: postgres:15
-    container_name: university
+    container_name: fefu-postgres
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: university_db
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-university_db}
     volumes:
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/01_init.sql:/docker-entrypoint-initdb.d/01_init.sql
+      - ./database/02_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
+      - ./database/03_students.sql:/docker-entrypoint-initdb.d/03_students.sql
+      - ./database/04_grade_scaling.sql:/docker-entrypoint-initdb.d/04_grade_scaling.sql
+      - ./database/05_grade_column_settings.sql:/docker-entrypoint-initdb.d/05_grade_column_settings.sql
+      - ./database/06_lesson_comments.sql:/docker-entrypoint-initdb.d/06_lesson_comments.sql
     ports:
       - "5432:5432"
-    restart: always
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB:-university_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - diary_network
 
-  # Аутентификация
+  migrate:
+    image: postgres:15
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./database:/migrations:ro
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-university_db}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-password}
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        for f in /migrations/04_grade_scaling.sql /migrations/05_grade_column_settings.sql /migrations/06_lesson_comments.sql; do
+          echo "Applying migration: $$f"
+          psql -v ON_ERROR_STOP=1 -h postgres -U $$POSTGRES_USER -d $$POSTGRES_DB -f "$$f"
+        done
+        echo "Migrations OK"
+    networks:
+      - diary_network
+    restart: "no"
+
   auth-service:
     build:
-      context: ./services/auth-service
-      dockerfile: Dockerfile
-    container_name: auth_subsystem
+      context: .
+      dockerfile: ./services/auth-service/Dockerfile
     ports:
       - "8000:8000"
     env_file:
-      - ./services/auth-service/.env.example
+      - path: config/.env
+        required: false
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@postgres:5432/university_db}
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - diary_network
 
-  # Посещаемость
-  # attendance-service:
-  #   build:
-  #     context: ./services/attendance-service
-  #     dockerfile: Dockerfile
-  #   container_name: attendance_subsystem
-  #   ports:
-  #     - "8001:8000"
-  #   env_file:
-  #     - ./services/attendance-service/.env.example
-  #   depends_on:
-  #     - postgres
+  attendance-service:
+    build:
+      context: .
+      dockerfile: ./services/attendance-service/Dockerfile
+    ports:
+      - "8001:8000"
+    env_file:
+      - path: config/.env
+        required: false
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@postgres:5432/university_db}
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - diary_network
 
-  # Оценочки
-  # grades-service:
-  #   build:
-  #     context: ./services/grades-service
-  #     dockerfile: Dockerfile
-  #   container_name: grades_subsystem
-  #   ports:
-  #     - "8002:8000"
-  #   env_file:
-  #     - ./services/grades-service/.env.example
-  #   depends_on:
-  #     - postgres
+  grades-service:
+    build:
+      context: .
+      dockerfile: ./services/grades-service/Dockerfile
+    ports:
+      - "8002:8000"
+    env_file:
+      - path: config/.env
+        required: false
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@postgres:5432/university_db}
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - diary_network
 
-  # Расписание
-  # schedule-service:
-  #   build:
-  #     context: ./services/schedule-service
-  #     dockerfile: Dockerfile
-  #   container_name: schedule_subsystem
-  #   ports:
-  #     - "8003:8000"
-  #   env_file:
-  #     - ./services/schedule-service/.env.example
-  #   depends_on:
-  #     - postgres
+  schedule-service:
+    build:
+      context: .
+      dockerfile: ./services/schedule-service/Dockerfile
+    ports:
+      - "8003:8000"
+    env_file:
+      - path: config/.env
+        required: false
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@postgres:5432/university_db}
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - diary_network
+
+  gateway:
+    image: nginx:alpine
+    expose:
+      - "80"
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      attendance-service:
+        condition: service_healthy
+      grades-service:
+        condition: service_healthy
+      schedule-service:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health/auth"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - diary_network
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      gateway:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - diary_network
+
+volumes:
+  postgres_data:

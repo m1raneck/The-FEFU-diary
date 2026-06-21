@@ -22,3 +22,12 @@ class UserCreate(BaseModel):
 class UserLogin(BaseModel):
     login: str
     password: str
+
+class TeacherCreate(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: str
+    phone: Optional[str] = None
+    department: Optional[str] = None
+    position: Optional[str] = None
+    degree: Optional[str] = None

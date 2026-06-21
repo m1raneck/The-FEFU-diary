@@ -1,63 +1,38 @@
-from fastapi import FastAPI, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from fastapi import Depends, FastAPI, HTTPException, status
 from passlib.context import CryptContext
-from jose import jwt, JWTError
-from datetime import datetime, timedelta
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, joinedload
 
-from . import models, schemas, database
+from fefu_common.auth import AuthDependencies
+from fefu_common.health import register_health_route
+from fefu_common.tokens import create_access_token
+
+from . import database, models, schemas
 
 app = FastAPI(title="Auth Service")
+register_health_route(app, "auth-service", database.get_db)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-SECRET_KEY = "super-secret-key-for-fefu-diary"
-ALGORITHM = "HS256"
 
-security = HTTPBearer()
+auth_deps = AuthDependencies(models.User, database.get_db)
+get_current_user = auth_deps.current_user_dependency()
 
-def get_current_user(auth: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(database.get_db)):
-    token = auth.credentials
-    
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
-        
-    user = db.query(models.User).filter(models.User.email == email).first()
-    if user is None:
-        raise credentials_exception
-    return user
 
-def hash_password(password: str):
+def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
 
-def create_access_token(data: dict):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=60)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
 
 
 @app.post("/api/auth/register", response_model=schemas.StandardResponse, status_code=status.HTTP_201_CREATED)
 def register(user_data: schemas.UserCreate, db: Session = Depends(database.get_db)):
-    db_user = db.query(models.User).filter(models.User.email == user_data.email).first()
-    if db_user:
+    if db.query(models.User).filter(models.User.email == user_data.email).first():
         return {"status": "error", "message": "Email already registered"}
 
-    existing_student = db.query(models.Student).filter(
-        models.Student.student_number == user_data.student_number
-    ).first()
-    if existing_student:
+    if db.query(models.Student).filter(models.Student.student_number == user_data.student_number).first():
         return {"status": "error", "message": "Student number already registered"}
 
     try:
@@ -65,7 +40,7 @@ def register(user_data: schemas.UserCreate, db: Session = Depends(database.get_d
             email=user_data.email,
             password_hash=hash_password(user_data.password),
             full_name=user_data.full_name,
-            phone=user_data.phone
+            phone=user_data.phone,
         )
         db.add(new_user)
         db.flush()
@@ -76,54 +51,154 @@ def register(user_data: schemas.UserCreate, db: Session = Depends(database.get_d
             student_number=user_data.student_number,
             enrollment_year=user_data.enrollment_year,
             birth_date=user_data.birth_date,
-            address=user_data.address
+            address=user_data.address,
         )
         db.add(new_student)
-        
+
+        role = db.query(models.Role).filter(models.Role.name == "student").first()
+        if role:
+            db.add(models.UserRole(user_id=new_user.id, role_id=role.id))
+
         db.commit()
         db.refresh(new_user)
-        
-        return {
-            "status": "success", 
-            "data": {"id": new_user.id}, 
-            "message": "User and Student profile created"
-        }
 
+        return {
+            "status": "success",
+            "data": {"id": new_user.id},
+            "message": "User and Student profile created",
+        }
+    except IntegrityError:
+        db.rollback()
+        return {"status": "error", "message": "Registration conflict — duplicate data"}
     except Exception as e:
         db.rollback()
-        return {"status": "error", "message": f"Database error: {str(e)}"}
+        raise HTTPException(status_code=500, detail=f"Database error: {e}") from e
+
 
 @app.post("/api/auth/login", response_model=schemas.StandardResponse)
 def login(credentials: schemas.UserLogin, db: Session = Depends(database.get_db)):
     user = db.query(models.User).filter(models.User.email == credentials.login).first()
-    
+
     if not user or not verify_password(credentials.password, user.password_hash):
         return {"status": "error", "message": "Invalid credentials"}
-    
+
     token = create_access_token(data={"sub": user.email, "user_id": user.id})
     return {"status": "success", "data": {"token": token}, "message": "Login successful"}
 
+
+@app.post("/api/auth/register-teacher", response_model=schemas.StandardResponse, status_code=status.HTTP_201_CREATED)
+def register_teacher(teacher_data: schemas.TeacherCreate, db: Session = Depends(database.get_db)):
+    if db.query(models.User).filter(models.User.email == teacher_data.email).first():
+        return {"status": "error", "message": "Email already registered"}
+
+    try:
+        new_user = models.User(
+            email=teacher_data.email,
+            password_hash=hash_password(teacher_data.password),
+            full_name=teacher_data.full_name,
+            phone=teacher_data.phone,
+        )
+        db.add(new_user)
+        db.flush()
+
+        new_teacher = models.Teacher(
+            user_id=new_user.id,
+            department=teacher_data.department,
+            position=teacher_data.position,
+            degree=teacher_data.degree,
+        )
+        db.add(new_teacher)
+
+        role = db.query(models.Role).filter(models.Role.name == "teacher").first()
+        if role:
+            db.add(models.UserRole(user_id=new_user.id, role_id=role.id))
+
+        db.commit()
+        db.refresh(new_user)
+
+        return {
+            "status": "success",
+            "data": {"id": new_user.id},
+            "message": "Teacher profile created",
+        }
+    except IntegrityError:
+        db.rollback()
+        return {"status": "error", "message": "Registration conflict — duplicate data"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {e}") from e
+
+
+@app.get("/api/users/students")
+def get_students(
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    students = (
+        db.query(models.User, models.Student)
+        .join(models.Student, models.User.id == models.Student.user_id)
+        .all()
+    )
+    return [
+        {
+            "id": student.id,
+            "full_name": user.full_name,
+            "student_number": student.student_number,
+            "group_id": student.group_id,
+        }
+        for user, student in students
+    ]
+
+
 @app.get("/api/users/me", response_model=schemas.StandardResponse)
-def read_users_me(current_user: models.User = Depends(get_current_user)):
+def read_users_me(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    user = (
+        db.query(models.User)
+        .options(
+            joinedload(models.User.student_profile).joinedload(models.Student.group),
+            joinedload(models.User.teacher_profile),
+        )
+        .filter(models.User.id == current_user.id)
+        .first()
+    )
+
+    role_rows = db.execute(
+        text("SELECT r.name FROM user_roles ur JOIN roles r ON ur.role_id = r.id WHERE ur.user_id = :uid"),
+        {"uid": current_user.id},
+    ).fetchall()
+    roles = [row[0] for row in role_rows]
+
     profile_data = {
-        "id": current_user.id,
-        "email": current_user.email,
-        "full_name": current_user.full_name,
-        "phone": current_user.phone,
-        "student_info": None
+        "id": user.id,
+        "email": user.email,
+        "full_name": user.full_name,
+        "phone": user.phone,
+        "roles": roles,
+        "student_info": None,
+        "teacher_info": None,
     }
-    
-    if current_user.student_profile:
-        sp = current_user.student_profile
+
+    if user.student_profile:
+        sp = user.student_profile
         profile_data["student_info"] = {
+            "student_id": sp.id,
             "student_number": sp.student_number,
             "group_id": sp.group_id,
+            "group_name": sp.group.name if sp.group else None,
             "enrollment_year": sp.enrollment_year,
-            "address": sp.address
+            "address": sp.address,
         }
-        
-    return {
-        "status": "success",
-        "data": profile_data,
-        "message": None
-    }
+
+    if user.teacher_profile:
+        tp = user.teacher_profile
+        profile_data["teacher_info"] = {
+            "teacher_id": tp.id,
+            "department": tp.department,
+            "position": tp.position,
+            "degree": tp.degree,
+        }
+
+    return {"status": "success", "data": profile_data, "message": None}

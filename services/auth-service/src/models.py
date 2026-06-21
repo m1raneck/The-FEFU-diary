@@ -9,6 +9,11 @@ class Role(Base):
     name = Column(String(50), nullable=False, unique=True)
     description = Column(Text)
 
+class UserRole(Base):
+    __tablename__ = "user_roles"
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    role_id = Column(Integer, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True)
+
 class Group(Base):
     __tablename__ = "groups"
     id = Column(Integer, primary_key=True, index=True)
