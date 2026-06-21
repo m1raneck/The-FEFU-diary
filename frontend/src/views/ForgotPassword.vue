@@ -1,8 +1,7 @@
 <template>
-  <div class="screen">
+  <div class="screen" :class="{ 'is-mobile': isMobile }">
     <div class="login-card">
       <div class="card-content">
-        <div class="screen" :class="{ 'is-mobile': isMobile }"></div>
         <div class="title-section">
           <div class="icon-wrapper">
             <img src="@/assets/icon.png" alt="Icon" class="icon" />

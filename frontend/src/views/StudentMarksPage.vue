@@ -22,15 +22,17 @@
 </thead>
           <tbody>
             <tr v-for="row in rows" :key="row.date">
-              <td class="grade-cell col-center">
-  <span v-if="!isMobile" class="grade-value" :class="gradeClass(row.grade)">{{ row.grade ?? '—' }}</span>
-  <span v-else class="grade-chip" :class="gradeChipClass(row.grade)">{{ formatGrade(row.grade) }}</span>
-</td>
-<td class="attendance-cell col-center">
-  <span v-if="!isMobile" class="attendance-icon" :class="row.present === true ? 'present' : (row.present === false ? 'absent' : '')">{{ row.present === true ? '✓' : (row.present === false ? '✗' : '—') }}</span>
-  <span v-else class="attendance-chip" :class="attendanceChipClass(row.present)">{{ attendanceText(row.present) }}</span>
-</td>
-            </tr>
+  <td class="date-cell">{{ row.dateLabel }}</td>
+  <td class="grade-cell col-center">
+    <span v-if="!isMobile" class="grade-value" :class="gradeClass(row.grade)">{{ row.grade ?? '—' }}</span>
+    <span v-else class="grade-chip" :class="gradeChipClass(row.grade)">{{ formatGrade(row.grade) }}</span>
+  </td>
+  <td class="attendance-cell col-center">
+    <span v-if="!isMobile" class="attendance-icon" :class="row.present === true ? 'present' : (row.present === false ? 'absent' : '')">{{ row.present === true ? '✓' : (row.present === false ? '✗' : '—') }}</span>
+    <span v-else class="attendance-chip" :class="attendanceChipClass(row.present)">{{ attendanceText(row.present) }}</span>
+  </td>
+  <td class="comment-cell">{{ row.comment || '—' }}</td>
+</tr>
           </tbody>
         </table>
       </div>
@@ -45,7 +47,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { getGrades, getAttendance, getLessonComments, normalizeDate } from '@/services/marks'
 
 const props = defineProps({
