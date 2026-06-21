@@ -1,5 +1,5 @@
 <template>
-  <div class="screen">
+  <div class="screen" :class="{ 'is-mobile': isMobile }">
     <div class="login-card">
       <div class="card-content">
         <div class="title-section">
@@ -55,46 +55,57 @@ export default {
   data() {
     return {
       form: { email: '', password: '' },
-      errors: { email: '', password: '' }
+      errors: { email: '', password: '' },
+      isMobile: false
     }
   },
+  mounted() {
+    this.checkIfMobile();
+    window.addEventListener('resize', this.checkIfMobile);
+  },
+  beforeDestroy() {
+    window.removeEventListener('resize', this.checkIfMobile);
+  },
   methods: {
+    checkIfMobile() {
+      this.isMobile = window.innerWidth < 768;
+    },
     validateEmail(email) {
-      const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      return re.test(email)
+      const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return re.test(email);
     },
     validateForm() {
-      let isValid = true
+      let isValid = true;
       if (!this.form.email) {
-        this.errors.email = 'Пожалуйста, введите почту'
-        isValid = false
+        this.errors.email = 'Пожалуйста, введите почту';
+        isValid = false;
       } else if (!this.validateEmail(this.form.email)) {
-        this.errors.email = 'Введите корректный email (например, name@domain.com)'
-        isValid = false
+        this.errors.email = 'Введите корректный email (например, name@domain.com)';
+        isValid = false;
       }
       if (!this.form.password) {
-        this.errors.password = 'Пожалуйста, введите пароль'
-        isValid = false
+        this.errors.password = 'Пожалуйста, введите пароль';
+        isValid = false;
       } else if (this.form.password.length < 4) {
-        this.errors.password = 'Пароль должен содержать минимум 4 символа'
-        isValid = false
+        this.errors.password = 'Пароль должен содержать минимум 4 символа';
+        isValid = false;
       }
-      return isValid
+      return isValid;
     },
     clearError(field) {
-      this.errors[field] = ''
+      this.errors[field] = '';
     },
     async handleLogin() {
-      if (!this.validateForm()) return
+      if (!this.validateForm()) return;
       try {
-        await login(this.form.email, this.form.password)
-        this.$router.push('/schedule')
+        await login(this.form.email, this.form.password);
+        this.$router.push('/schedule');
       } catch (err) {
-        this.errors.password = err.message || 'Ошибка входа. Проверьте email и пароль.'
+        this.errors.password = err.message || 'Ошибка входа. Проверьте email и пароль.';
       }
     },
     forgotPassword() {
-      this.$router.push('/forgot-password')
+      this.$router.push('/forgot-password');
     }
   }
 }
@@ -120,6 +131,26 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 2rem;
+}
+
+.screen.is-mobile {
+  background-image: url('@/assets/main2.PNG');
+  background-color: #49709ac2;
+  background-blend-mode: overlay;
+  background-position: left center;
+  position: relative;
+}
+.screen.is-mobile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.1) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+.screen.is-mobile > * {
+  position: relative;
+  z-index: 1;
 }
 
 .login-card {

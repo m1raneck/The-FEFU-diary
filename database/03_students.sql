@@ -1,6 +1,6 @@
 --$2b$12$wXp11PgvF2xiwaw0BkqdOuXd/Q2fahznvMJhd88L9xLvKY3U3XK56
 INSERT INTO users (email, password_hash, full_name, phone) VALUES
-('kovalev1@student.ru', '$2b$12$wXp11PgvF2xiwaw0BkqdOuXd/Q2fahznvMJhd88L9xLvKY3U3XK56', 'Ковалёв Леонид', NULL),
+('kovalev1@student.ru', '$2y$12$EzjJ9cXFtQSfIfgovggeie6b9OSKEbDiFwKJ/tElKDVE1LNI2J2je', 'Ковалёв Леонид', NULL),
 ('shvarts1@student.ru', '$2b$12$wXp11PgvF2xiwaw0BkqdOuXd/Q2fahznvMJhd88L9xLvKY3U3XK56', 'Шварц Анжелика', NULL),
 ('uglitsky1@student.ru', '$2b$12$wXp11PgvF2xiwaw0BkqdOuXd/Q2fahznvMJhd88L9xLvKY3U3XK56', 'Углицкий Евгений', NULL),
 ('smirnov1@student.ru', '$2b$12$wXp11PgvF2xiwaw0BkqdOuXd/Q2fahznvMJhd88L9xLvKY3U3XK56', 'Смирнов Григорий', NULL),

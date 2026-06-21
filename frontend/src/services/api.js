@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost'
+const API_URL = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || 'http://localhost')
 
 export function getToken() {
   return localStorage.getItem('token')
@@ -58,7 +58,6 @@ export async function apiPost(path, body) {
   })
 }
 
-/** POST without Authorization header — for login/register */
 export async function apiPublicPost(path, body) {
   const response = await fetch(`${API_URL}${path}`, {
     method: 'POST',

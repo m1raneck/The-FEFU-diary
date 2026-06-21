@@ -1,9 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import LoginPage from '@/views/LoginPage.vue'
 import ForgotPassword from '@/views/ForgotPassword.vue'
-import SchedulePage from '@/views/SchedulePage.vue'
 import StudentGradesPage from '@/views/StudentGradesPage.vue'
 import { getStoredUser, isStudent } from '@/services/auth'
+import AllGradesPage from '@/views/AllGradesPage.vue'
 
 const routes = [
   {
@@ -26,6 +26,12 @@ const routes = [
     name: 'MyGrades',
     component: StudentGradesPage,
     meta: { requiresAuth: true, studentOnly: true }
+  },
+  {
+    path: '/all-grades',
+    name: 'AllGrades',
+    component: AllGradesPage,
+    meta: { requiresAuth: true, role: 'teacher' },
   }
 ]
 

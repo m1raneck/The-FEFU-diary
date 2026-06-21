@@ -1,5 +1,5 @@
 <template>
-  <div class="screen">
+  <div class="screen" :class="{ 'is-mobile': isMobile }">
     <div class="grades-card">
       <div class="card-header">
         <div class="header-left">
@@ -18,7 +18,7 @@
       </div>
 
       <div class="header-section">
-        <h1 class="page-title">Оценки (Студент)</h1>
+        <h1 class="page-title">Оценки</h1>
         <p v-if="user?.student_info?.group_name" class="group-label">
           Группа: {{ user.student_info.group_name }}
         </p>
@@ -32,7 +32,6 @@
         <div v-for="subj in subjects" :key="subj.scheduleId" class="subject-card">
           <div class="subject-header">
             <h2>{{ subj.name }}</h2>
-            <span v-if="subj.room" class="room-badge">Ауд. {{ subj.room }}</span>
           </div>
           <div class="table-wrapper">
             <table class="grades-table">
@@ -80,7 +79,8 @@ export default {
       user: getStoredUser(),
       loading: true,
       error: '',
-      subjects: []
+      subjects: [],
+      isMobile: false
     }
   },
   computed: {
@@ -90,6 +90,8 @@ export default {
     }
   },
   async mounted() {
+    this.checkIfMobile()
+    window.addEventListener('resize', this.checkIfMobile)
     if (!isStudent(this.user)) {
       this.$router.replace('/schedule')
       return
@@ -103,7 +105,13 @@ export default {
       this.loading = false
     }
   },
+  beforeDestroy() {
+    window.removeEventListener('resize', this.checkIfMobile)
+  },
   methods: {
+    checkIfMobile() {
+      this.isMobile = window.innerWidth < 768
+    },
     gradeChipClass(grade) {
       if (grade === '+') return 'chip-plus'
       if (grade === '-') return 'chip-minus'
@@ -203,6 +211,8 @@ export default {
         }).sort((a, b) => a.name.localeCompare(b.name))
       } catch (e) {
         this.error = e.message || 'Ошибка загрузки'
+      } finally {
+        this.loading = false
       }
     },
     goToSchedule() {
@@ -217,7 +227,6 @@ export default {
 </script>
 
 <style scoped>
-/* Все стили остаются без изменений – они уже красивые и рабочие */
 .screen {
   min-height: 100vh;
   background-image: url('@/assets/image.png');
@@ -326,7 +335,7 @@ export default {
   font-size: 28px;
   font-weight: 700;
   color: #1f3b4c;
-  background: rgba(192, 222, 255, 0.2);
+  background: rgba(216, 230, 251, 0.5);
   display: inline-block;
   padding: 0.4rem 1.5rem;
   border-radius: 20px;
@@ -338,6 +347,7 @@ export default {
   font-size: 14px;
   font-weight: 500;
 }
+
 .state-message {
   text-align: center;
   padding: 40px;
@@ -348,12 +358,14 @@ export default {
   border-radius: 28px;
 }
 .state-message.error { color: #b13b3b; }
+
 .subjects-list {
   padding: 0 2rem 2rem;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
 }
+
 .subject-card {
   background: rgba(168, 199, 231, 0.85);
   backdrop-filter: blur(4px);
@@ -362,9 +374,10 @@ export default {
   box-shadow: 0 8px 20px rgba(0,0,0,0.1);
   border: 1px solid rgba(255,255,255,0.6);
 }
+
 .subject-header {
   padding: 16px 24px;
-  background: rgba(100, 140, 180, 0.1);
+  background: rgba(163, 193, 232, 0.25);
   border-bottom: 1px solid rgba(86,112,193,0.2);
 }
 .subject-header h2 {
@@ -373,6 +386,7 @@ export default {
   color: #1a4c6e;
   margin: 0;
 }
+
 .table-wrapper {
   overflow-x: auto;
 }
@@ -427,6 +441,7 @@ export default {
   font-size: 18px;
   padding: 4px 16px;
 }
+
 .card-footer {
   padding: 14px 24px;
   font-size: 14px;
@@ -441,8 +456,103 @@ export default {
 .sep {
   opacity: 0.5;
 }
+
+/* ========== Мобильная адаптация ========== */
+.screen.is-mobile {
+  background: url('@/assets/phone2.PNG');
+  background-color: #8fa0d4;
+  position: relative;
+  overflow: hidden;
+}
+
+.screen.is-mobile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.1) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.screen.is-mobile > * {
+  position: relative;
+  z-index: 1;
+}
+
+.screen.is-mobile .grades-card {
+  height: calc(100vh - 1rem);
+  overflow-y: auto;
+  border-radius: 32px;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(12px);
+  border: none;
+  box-shadow: none;
+}
+
+.screen.is-mobile .card-header {
+  flex-direction: row !important;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.8rem 1rem;
+  flex-wrap: nowrap;
+  gap: 6px;
+  border-bottom: none;
+}
+
+.screen.is-mobile .header-right {
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.screen.is-mobile .user-avatar {
+  display: none;
+}
+
+.screen.is-mobile .schedule-btn,
+.screen.is-mobile .logout-btn {
+  padding: 5px 12px;
+  font-size: 12px;
+  border-radius: 20px;
+}
+
+.screen.is-mobile .header-section {
+  margin: 0.5rem 0;
+}
+
+.screen.is-mobile .page-title {
+  font-size: 22px;
+}
+
+.screen.is-mobile .subjects-list {
+  padding: 0 1rem 1rem;
+  gap: 1rem;
+}
+
+.screen.is-mobile .grades-table th,
+.screen.is-mobile .grades-table td {
+  padding: 8px 6px;
+  font-size: 12px;
+}
+
+.screen.is-mobile .grade-chip,
+.screen.is-mobile .attendance-chip {
+  padding: 3px 12px;
+  font-size: 12px;
+  min-width: 50px;
+}
+
+.screen.is-mobile .chip-present,
+.screen.is-mobile .chip-absent {
+  font-size: 14px;
+}
+
+.screen.is-mobile .card-footer {
+  font-size: 12px;
+  gap: 12px;
+}
+
 @media (max-width: 768px) {
-  .screen { padding: 1rem; }
+  .screen { padding: 0.5rem; }
   .card-header { padding: 1rem 1.5rem; flex-direction: column; align-items: stretch; }
   .header-right { justify-content: center; }
   .grades-table th, .grades-table td { padding: 8px 6px; font-size: 12px; }
