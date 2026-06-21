@@ -36,6 +36,7 @@
 </div>
           </div>
           <label class="import-file-btn">
+            Загрузить XLSX
             <input type="file" accept=".csv,.xlsx,.xls" @change="handleFileUpload" style="display: none" ref="fileInput" />
           </label>
           <button class="scale-settings-btn" @click.stop="openScalePopup($event)">⚙ Шкала и веса</button>
