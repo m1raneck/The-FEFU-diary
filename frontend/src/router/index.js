@@ -3,7 +3,8 @@ import LoginPage from '@/views/LoginPage.vue'
 import ForgotPassword from '@/views/ForgotPassword.vue'
 import SchedulePage from '@/views/SchedulePage.vue'
 import StudentGradesPage from '@/views/StudentGradesPage.vue'
-import { getStoredUser, isStudent } from '@/services/auth'
+import TeacherGradesPage from '@/views/TeacherGradesPage.vue'
+import { getStoredUser, isStudent, isTeacher } from '@/services/auth'
 
 const routes = [
   {
@@ -26,6 +27,12 @@ const routes = [
     name: 'MyGrades',
     component: StudentGradesPage,
     meta: { requiresAuth: true, studentOnly: true }
+  },
+  {
+    path: '/all-grades',
+    name: 'AllGrades',
+    component: TeacherGradesPage,
+    meta: { requiresAuth: true, teacherOnly: true }
   }
 ]
 
@@ -41,6 +48,10 @@ router.beforeEach((to, from, next) => {
   }
   if (to.meta.studentOnly && !isStudent(getStoredUser())) {
     next('/schedule')
+    return
+  }
+  if (to.meta.teacherOnly && !isTeacher(getStoredUser())) {
+    next(isStudent(getStoredUser()) ? '/my-grades' : '/schedule')
     return
   }
   next()

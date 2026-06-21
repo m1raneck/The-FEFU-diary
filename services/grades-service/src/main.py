@@ -28,12 +28,30 @@ def list_categories(
     db: Session = Depends(database.get_db),
     _: models.User = Depends(get_current_user),
 ):
-    return (
+    rows = (
         db.query(models.GradeCategory)
         .filter(models.GradeCategory.schedule_id == schedule_id)
         .order_by(models.GradeCategory.code)
         .all()
     )
+    if not rows:
+        return [
+            schemas.GradeCategoryResponse(
+                id=0,
+                schedule_id=schedule_id,
+                **cat.model_dump(),
+            )
+            for cat in grading_helpers.DEFAULT_CATEGORIES
+        ]
+
+    if grading_helpers.categories_need_default_weights(rows):
+        for row in rows:
+            row.weight = grading_helpers.DEFAULT_CATEGORY_WEIGHT
+        db.commit()
+        for row in rows:
+            db.refresh(row)
+
+    return rows
 
 
 @app.put("/api/grades/categories", response_model=List[schemas.GradeCategoryResponse])

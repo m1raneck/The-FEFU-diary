@@ -14,19 +14,20 @@
 
       <div class="import-panel">
         <div class="import-controls">
-          <button class="sample-btn" @click="downloadSampleCSV">Пример CSV</button>
+          <button class="sample-btn" @click="downloadSampleXlsx">Пример XLSX</button>
           <div class="export-dropdown" ref="exportDropdownRef">
             <button type="button" class="sample-btn export-trigger" @click.stop="toggleExportMenu">
               📥 Экспорт
             </button>
             <div v-if="exportMenuOpen" class="export-menu" @click.stop>
               <button type="button" class="export-menu-item" @click="pickExportFormat('csv')">CSV (.csv)</button>
+              <button type="button" class="export-menu-item" @click="pickExportFormat('xlsx')">Excel (.xlsx)</button>
               <button type="button" class="export-menu-item" @click="pickExportFormat('excel')">Excel (.xls)</button>
             </div>
           </div>
           <label class="import-file-btn">
-            Загрузить CSV
-            <input type="file" accept=".csv" @change="handleFileUpload" style="display: none" ref="fileInput" />
+            Загрузить XLSX
+            <input type="file" accept=".csv,.xlsx,.xls" @change="handleFileUpload" style="display: none" ref="fileInput" />
           </label>
           <button class="scale-settings-btn" @click.stop="openScalePopup($event)">⚙ Шкала и веса</button>
           <button v-if="!importModeActive" class="switch-mode-btn" @click="activateImportMode">➕ Импорт нескольких
@@ -42,7 +43,7 @@
               :max="dates.length"
               placeholder="0"
             />
-            <button v-if="minAttendanceFilter > 0" type="button" class="filter-reset" @click="minAttendanceFilter = 0">×</button>
+            <button v-if="minAttendanceFilter > 0" type="button" class="filter-reset" @click="resetMinAttendanceFilter">×</button>
           </div>
           <div class="student-search">
             <span class="filter-label">Поиск:</span>
@@ -109,12 +110,12 @@
             <tr v-if="visibleStudentEntries.length === 0" class="empty-row">
               <td :colspan="4 + dates.length" class="empty-cell">Студенты не найдены</td>
             </tr>
-            <tr v-for="({ student, sIdx }, idx) in visibleStudentEntries" :key="student.id" class="student-row">
+            <tr v-for="({ student, sIdx }, idx) in visibleStudentEntries" :key="student.id" class="student-row" :class="{ 'row-warn-att': isAttendanceWarning(student) }">
               <td class="col-num">{{ idx + 1 }}</td>
-              <td class="col-name">{{ student.name }}</td>
+              <td class="col-name" :class="{ 'warn-att': isAttendanceWarning(student) }">{{ student.name }}</td>
               <td class="col-stat"><span class="avg-badge" :class="getAvgClass(student.avg)">{{ student.avg }}</span>
               </td>
-              <td class="col-stat" :class="{ 'warn-att': student.attendance < 60 }">{{ student.attendance }}%</td>
+              <td class="col-stat" :class="{ 'warn-att': isAttendanceWarning(student) }">{{ student.attendance }}%</td>
               <td v-for="(rec, dIdx) in student.records" :key="dIdx" class="combo-cell">
                 <div class="combo-inner">
                   <div class="combo-grade" @click.stop="editGrade(sIdx, dIdx)">
@@ -279,6 +280,7 @@
 </template>
 <script setup>
 import { ref, nextTick, onMounted, onBeforeUnmount, computed, watch } from 'vue'
+import * as XLSX from 'xlsx'
 import { getStudents, getGrades, getAttendance, getLessonComments, saveGrade, saveAttendance, saveLessonComment, bulkSaveGrades, getGradeScale, saveGradeScale, getGradeCategories, saveGradeCategories, getGradeColumns, saveGradeColumns, normalizeDate } from '@/services/marks'
 
 const props = defineProps({ 
@@ -295,16 +297,61 @@ const students = ref([])
 const studentsMap = ref(new Map())
 const minAttendanceFilter = ref(0)
 const studentSearchQuery = ref('')
+const MIN_ATTENDANCE_STORAGE_KEY = 'journalMinAttendanceFilters'
+
+function loadMinAttendanceFilter() {
+  if (!props.scheduleId) {
+    minAttendanceFilter.value = 0
+    return
+  }
+  try {
+    const stored = JSON.parse(localStorage.getItem(MIN_ATTENDANCE_STORAGE_KEY) || '{}')
+    const value = Number(stored[props.scheduleId] ?? 0)
+    minAttendanceFilter.value = Number.isFinite(value) && value > 0 ? value : 0
+  } catch {
+    minAttendanceFilter.value = 0
+  }
+}
+
+function saveMinAttendanceFilter(value) {
+  if (!props.scheduleId) return
+  try {
+    const stored = JSON.parse(localStorage.getItem(MIN_ATTENDANCE_STORAGE_KEY) || '{}')
+    const normalized = Math.max(0, Math.min(dates.length, Number(value) || 0))
+    if (normalized > 0) stored[props.scheduleId] = normalized
+    else delete stored[props.scheduleId]
+    localStorage.setItem(MIN_ATTENDANCE_STORAGE_KEY, JSON.stringify(stored))
+    if (normalized !== Number(value)) minAttendanceFilter.value = normalized
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function resetMinAttendanceFilter() {
+  minAttendanceFilter.value = 0
+  saveMinAttendanceFilter(0)
+}
+
+function isAttendanceWarning(student) {
+  if (minAttendanceFilter.value > 0) {
+    return (student.attendanceCount ?? 0) < minAttendanceFilter.value
+  }
+  return student.attendance < 60
+}
+
+function sortStudentsAlphabetically() {
+  students.value.sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+}
 
 const visibleStudentEntries = computed(() => {
   const q = studentSearchQuery.value.trim().toLowerCase()
   return students.value
     .map((student, sIdx) => ({ student, sIdx }))
     .filter(({ student }) => {
-      if (minAttendanceFilter.value && (student.attendanceCount ?? 0) < minAttendanceFilter.value) return false
       if (q && !student.name.toLowerCase().includes(q)) return false
       return true
     })
+    .sort((a, b) => a.student.name.localeCompare(b.student.name, 'ru'))
 })
 
 const gradeScale = ref({
@@ -315,10 +362,47 @@ const gradeScale = ref({
 })
 
 const categoryWeights = ref([
-  { code: 'DZ', name: 'ДЗ', weight: 0.3 },
-  { code: 'KR', name: 'КР', weight: 0.5 },
-  { code: 'DOP', name: 'ДОП', weight: 0.2 },
+  { code: 'DZ', name: 'ДЗ', weight: 1 },
+  { code: 'KR', name: 'КР', weight: 1 },
+  { code: 'DOP', name: 'ДОП', weight: 1 },
 ])
+
+const DEFAULT_CATEGORY_TEMPLATE = [
+  { code: 'DZ', name: 'ДЗ', weight: 1 },
+  { code: 'KR', name: 'КР', weight: 1 },
+  { code: 'DOP', name: 'ДОП', weight: 1 },
+]
+
+const LEGACY_CATEGORY_WEIGHTS = { DZ: 0.3, KR: 0.5, DOP: 0.2 }
+const LEGACY_WEIGHT_VALUES = new Set([0.2, 0.3, 0.5])
+
+function isLegacyCategoryWeight(code, weight) {
+  const w = Number(weight)
+  const legacy = LEGACY_CATEGORY_WEIGHTS[code]
+  if (legacy != null && Math.abs(w - legacy) < 0.001) return true
+  return LEGACY_WEIGHT_VALUES.has(w)
+}
+
+function categoriesNeedDefaultWeights(categories) {
+  if (!categories?.length) return true
+  if (categories.every(c => !c.id)) return true
+  return categories.every(c => isLegacyCategoryWeight(c.code, c.weight))
+}
+
+function applyCategoryTemplate(categories) {
+  const byCode = Object.fromEntries((categories || []).map(c => [c.code, c]))
+  const useDefaults = categoriesNeedDefaultWeights(categories)
+  return DEFAULT_CATEGORY_TEMPLATE.map(t => {
+    const fromApi = byCode[t.code]
+    if (!fromApi) return { ...t }
+    return {
+      id: fromApi.id,
+      code: t.code,
+      name: fromApi.name || t.name,
+      weight: useDefaults ? 1 : Number(fromApi.weight),
+    }
+  })
+}
 
 function categoriesToPayload() {
   return categoryWeights.value.map(c => ({
@@ -365,13 +449,12 @@ async function loadScaleAndCategories() {
       getGradeCategories(props.scheduleId),
     ])
     if (rules?.length) gradeScale.value = rulesToLocalScale(rules)
-    if (categories?.length) {
-      categoryWeights.value = categories.map(c => ({
-        id: c.id,
-        code: c.code,
-        name: c.name,
-        weight: Number(c.weight),
-      }))
+
+    const useDefaults = categoriesNeedDefaultWeights(categories)
+    categoryWeights.value = applyCategoryTemplate(categories)
+
+    if (useDefaults) {
+      await saveGradeCategories(props.scheduleId, categoriesToPayload())
     }
   } catch (err) {
     console.warn('Шкала/веса не загружены, используются значения по умолчанию', err)
@@ -477,6 +560,7 @@ async function loadStudents() {
       attendancePoints: 0,
       records: dates.map(() => ({ grade: '', present: true, comment: '' }))
     }))
+    sortStudentsAlphabetically()
     
     filtered.forEach(s => {
       studentsMap.value.set(s.full_name, s.id)
@@ -606,7 +690,7 @@ const hasEnabledMappings = computed(() => csvScoreColumns.value.some(c => c.targ
 function activateImportMode() {
   importModeActive.value = true
   if (csvScoreColumns.value.length === 0) {
-    setImportMsg('Загрузите CSV-файл с процентами', 'info')
+    setImportMsg('Загрузите XLSX-файл с журналом или CSV с процентами', 'info')
   }
 }
 
@@ -633,20 +717,186 @@ function parseCSV(text) {
   return rows
 }
 
+function readFileToRows(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    const isExcel = /\.xlsx?$/i.test(file.name)
+    reader.onload = (e) => {
+      try {
+        if (isExcel) {
+          const workbook = XLSX.read(e.target.result, { type: 'array' })
+          const sheet = workbook.Sheets[workbook.SheetNames[0]]
+          resolve(XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false }))
+        } else {
+          resolve(parseCSV(e.target.result))
+        }
+      } catch (err) {
+        reject(err)
+      }
+    }
+    reader.onerror = () => reject(new Error('Не удалось прочитать файл'))
+    if (isExcel) reader.readAsArrayBuffer(file)
+    else reader.readAsText(file, 'UTF-8')
+  })
+}
+
+function isJournalImportFormat(headerRow) {
+  const headers = headerRow.map(h => String(h).trim())
+  const hasFio = headers.some(h => /фио|студент|student|name/i.test(h))
+  const hasJournalMarkers = headers.some(h => /посещ/i.test(h)) ||
+    headers.some(h => /\d{1,2}\/\d{1,2}\s*\(/i.test(h))
+  return hasFio && hasJournalMarkers
+}
+
+function mapJournalColumns(headerRow) {
+  const headers = headerRow.map(h => String(h).trim())
+  let nameColIdx = headers.findIndex(h => /^(фио|студент|student|name)$/i.test(h))
+  if (nameColIdx === -1) nameColIdx = headers.findIndex(h => /фио|студент|student|name/i.test(h))
+  if (nameColIdx === -1 && headers.some(h => /^№$/i.test(h))) nameColIdx = 1
+
+  const dateColumns = {}
+  dates.forEach((date, dIdx) => {
+    headers.forEach((header, colIdx) => {
+      if (!header.includes(date)) return
+      if (!dateColumns[dIdx]) dateColumns[dIdx] = {}
+      if (/посещ/i.test(header)) dateColumns[dIdx].presence = colIdx
+      else if (/комм/i.test(header)) dateColumns[dIdx].comment = colIdx
+      else dateColumns[dIdx].grade = colIdx
+    })
+  })
+  return { nameColIdx, dateColumns }
+}
+
+function parseGradeFromImport(value) {
+  const s = String(value ?? '').trim()
+  if (!s || s === '—' || s === '-') return ''
+  if (s === '+' || s === '-') return s
+  const match = s.match(/^([\d.]+)/)
+  return match ? match[1] : s
+}
+
+function parsePresenceValue(value) {
+  const s = String(value ?? '').trim().toLowerCase()
+  if (!s || s === '—') return null
+  if (['✓', '✔', 'v', '+', 'да', 'yes', 'present', '1', 'p', 'п'].includes(s)) return true
+  if (['✗', '✘', 'x', 'нет', 'no', 'absent', '0', 'н', '-'].includes(s)) return false
+  return null
+}
+
+async function persistImportedJournal(dateColumns) {
+  const scheduleId = props.scheduleId
+  if (!scheduleId) return
+
+  for (let dIdx = 0; dIdx < dates.length; dIdx++) {
+    const cols = dateColumns[dIdx]
+    if (!cols) continue
+    const gradeDate = dateToIso(dates[dIdx])
+
+    if (cols.grade !== undefined) {
+      const gradesToSend = []
+      for (const student of students.value) {
+        const rec = student.records[dIdx]
+        if (rec.grade === '+' || rec.grade === '-') {
+          gradesToSend.push({
+            student_id: student.id,
+            raw_score: rec.grade === '+' ? 1 : 0,
+            grade: rec.grade === '+' ? 1 : 0,
+            auto_convert: false,
+          })
+          continue
+        }
+        const rawScore = parseCellScore(rec.grade)
+        if (rawScore == null) continue
+        gradesToSend.push({
+          student_id: student.id,
+          raw_score: rawScore,
+          grade: convertScoreToGrade(rawScore),
+          auto_convert: true,
+        })
+      }
+      if (gradesToSend.length) {
+        await bulkSaveGrades({ scheduleId, gradeDate, grades: gradesToSend })
+      }
+    }
+
+    if (cols.presence !== undefined) {
+      for (const student of students.value) {
+        await saveAttendance({
+          studentId: student.id,
+          scheduleId,
+          status: student.records[dIdx].present ? 'present' : 'absent',
+          date: gradeDate,
+        })
+      }
+    }
+
+    if (cols.comment !== undefined) {
+      for (const student of students.value) {
+        await saveLessonComment({
+          studentId: student.id,
+          scheduleId,
+          lessonDate: gradeDate,
+          comment: student.records[dIdx].comment || '',
+        })
+      }
+    }
+  }
+}
+
+async function importJournalFromRows(rows) {
+  if (!props.scheduleId) throw new Error('Не выбрана пара (schedule_id)')
+
+  const { nameColIdx, dateColumns } = mapJournalColumns(rows[0])
+  if (nameColIdx === -1) throw new Error('Не найдена колонка ФИО')
+  if (!Object.keys(dateColumns).length) throw new Error('Не найдены колонки с датами')
+
+  let matched = 0
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r]
+    const name = String(row[nameColIdx] ?? '').trim()
+    if (!name) continue
+
+    const student = students.value.find(s => s.name.toLowerCase() === name.toLowerCase())
+    if (!student) continue
+    matched++
+
+    for (const [dIdxStr, cols] of Object.entries(dateColumns)) {
+      const dIdx = Number(dIdxStr)
+      const rec = student.records[dIdx]
+      if (cols.grade !== undefined) rec.grade = parseGradeFromImport(row[cols.grade])
+      if (cols.presence !== undefined) {
+        const present = parsePresenceValue(row[cols.presence])
+        if (present !== null) rec.present = present
+      }
+      if (cols.comment !== undefined) {
+        rec.comment = String(row[cols.comment] ?? '').trim()
+      }
+    }
+  }
+
+  if (matched === 0) throw new Error('Не найдено совпадений студентов по ФИО')
+
+  recalcStudentStats()
+  await persistImportedJournal(dateColumns)
+  await loadMarksFromDb()
+  recalcStudentStats()
+  sortStudentsAlphabetically()
+  setImportMsg(`✅ Импортировано ${matched} студентов из журнала`, 'success')
+}
+
 function handleFileUpload(event) {
   const file = event.target.files[0]
   if (!file) return
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    try {
-      const rows = parseCSV(e.target.result)
+  readFileToRows(file)
+    .then(async (rows) => {
       if (rows.length < 2) throw new Error('Файл должен содержать заголовки и данные')
-      analyzeCSVForMultiImport(rows)
-    } catch (err) {
-      setImportMsg(err.message, 'error')
-    }
-  }
-  reader.readAsText(file, 'UTF-8')
+      if (isJournalImportFormat(rows[0])) {
+        await importJournalFromRows(rows)
+      } else {
+        analyzeCSVForMultiImport(rows)
+      }
+    })
+    .catch((err) => setImportMsg(err.message, 'error'))
   event.target.value = ''
 }
 
@@ -794,6 +1044,14 @@ function setImportMsg(msg, type) {
 }
 
 watch(csvScoreColumns, () => { computeMultiPreview() }, { deep: true })
+
+watch(minAttendanceFilter, (value) => {
+  saveMinAttendanceFilter(value)
+})
+
+watch(() => props.scheduleId, () => {
+  loadMinAttendanceFilter()
+})
 
 // ========== Остальные методы (типы колонок, оценки, посещаемость) ==========
 const scalePopup = ref({ visible: false })
@@ -1020,18 +1278,39 @@ function toggleExportMenu() {
 function pickExportFormat(format) {
   exportMenuOpen.value = false
   if (format === 'csv') exportJournalCsv()
+  else if (format === 'xlsx') exportJournalXlsx()
   else exportJournalExcel()
 }
 
-function downloadSampleCSV() {
-  const sampleRows = [
-    ['Студент', 'Тест 1 (%)', 'Тест 2 (%)'],
-    ['Ковалёв Леонид', '85', '64'],
-    ['Шварц Анжелика', '42', '33'],
-    ['Углицкий Евгений', '78', '91'],
-    ['Смирнов Григорий', '94', '73']
+function buildSampleJournalRows() {
+  const header = ['№', 'ФИО', 'Ср.', 'П.%']
+  dates.forEach((date, dIdx) => {
+    const type = getTypeLabel(columnSettings.value[dIdx].type)
+    header.push(`${date} (${type})`)
+    header.push(`${date} посещ.`)
+    header.push(`${date} комм.`)
+  })
+  const emptyDates = dates.map(() => ['—', '✓', ''])
+  const sampleData = [
+    { name: 'Ковалёв Леонид', avg: '4', att: '80%', cells: [['85', '✓', ''], ['64', '✓', ''], ...emptyDates.slice(2)] },
+    { name: 'Морозов Максим', avg: '—', att: '40%', cells: [['10', '✗', 'болел'], ['—', '✗', ''], ...emptyDates.slice(2)] },
+    { name: 'Шварц Анжелика', avg: '3', att: '60%', cells: [['42', '✓', ''], ['33', '✗', ''], ...emptyDates.slice(2)] },
   ]
-  downloadStyledExcelFile('example_marks.xls', sampleRows)
+  return [
+    header,
+    ...sampleData.map((s, i) => [i + 1, s.name, s.avg, s.att, ...s.cells.flat()]),
+  ]
+}
+
+function downloadSampleXlsx() {
+  downloadXlsxFile('example_journal.xlsx', buildSampleJournalRows())
+}
+
+function downloadXlsxFile(filename, rows) {
+  const ws = XLSX.utils.aoa_to_sheet(rows)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Журнал')
+  XLSX.writeFile(wb, filename)
 }
 
 function sanitizeFileName(value) {
@@ -1064,7 +1343,8 @@ function buildJournalExportRows() {
     header.push(`${date} комм.`)
   })
 
-  const rows = students.value.map((student, index) => {
+  const sorted = [...students.value].sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+  const rows = sorted.map((student, index) => {
     const row = [
       index + 1,
       student.name,
@@ -1184,8 +1464,19 @@ function exportJournalExcel() {
   setImportMsg('✅ Журнал экспортирован в Excel', 'success')
 }
 
+function exportJournalXlsx() {
+  if (!students.value.length) {
+    setImportMsg('Нет данных для экспорта', 'error')
+    return
+  }
+  const name = sanitizeFileName(`${props.groupName}_${props.subjectName}`)
+  downloadXlsxFile(`journal_${name}.xlsx`, buildJournalExportRows())
+  setImportMsg('✅ Журнал экспортирован в XLSX', 'success')
+}
+
 // ========== Жизненный цикл ==========
 onMounted(() => {
+  loadMinAttendanceFilter()
   loadScaleAndCategories()
   loadStudents()
   document.addEventListener('click', handleClickOutside)
@@ -1566,6 +1857,14 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
 .warn-att {
   color: #b13b3b;
   font-weight: 600;
+}
+
+.row-warn-att {
+  background: rgba(177, 59, 59, 0.04);
+}
+
+.row-warn-att .combo-inner {
+  border-color: rgba(177, 59, 59, 0.25);
 }
 
 .date-col {
