@@ -297,7 +297,6 @@ const visibleStudentEntries = computed(() => {
   return students.value
     .map((student, sIdx) => ({ student, sIdx }))
     .filter(({ student }) => {
-      if (minAttendanceFilter.value && (student.attendanceCount ?? 0) < minAttendanceFilter.value) return false
       if (q && !student.name.toLowerCase().includes(q)) return false
       return true
     })
@@ -737,6 +736,10 @@ async function applyMultiImport() {
     setImportMsg('Не выбрана пара (schedule_id)', 'error')
     return
   }
+
+  console.log('Импорт начат, scheduleId:', scheduleId)
+  console.log('Студенты в БД:', students.value.map(s => s.name))
+
   let totalSaved = 0
 
   for (const col of csvScoreColumns.value) {
@@ -747,12 +750,14 @@ async function applyMultiImport() {
 
     for (let rowIdx = 0; rowIdx < rawCsvRows.value.length; rowIdx++) {
       const studentNameRaw = col.rawNames[rowIdx]
-      const student = students.value.find(s => s.name.toLowerCase() === studentNameRaw?.toLowerCase())
-      if (!student) continue
+      if (!studentNameRaw) continue  // пропускаем пустые строки
 
-      const studentId = studentsMap.value.get(student.name)
-      if (!studentId) {
-        console.warn(`Студент ${student.name} не найден в БД`)
+      // Ищем студента по имени (с trim и регистронезависимо)
+      const student = students.value.find(s => 
+        s.name.toLowerCase().trim() === studentNameRaw.toLowerCase().trim()
+      )
+      if (!student) {
+        console.warn(`Студент "${studentNameRaw}" не найден в БД`)
         continue
       }
 
@@ -761,7 +766,7 @@ async function applyMultiImport() {
       if (col.useGradeScale && finalGrade === null) finalGrade = percent
 
       gradesToSend.push({
-        student_id: studentId,
+        student_id: student.id,   // <-- исправлено
         raw_score: percent,
         auto_convert: col.useGradeScale,
         grade: col.useGradeScale ? convertScoreToGrade(percent) : Math.min(percent, 100),
@@ -1329,6 +1334,18 @@ function checkIfMobile() {
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
+}
+.import-controls .switch-mode-btn {
+  flex: 0 1 auto;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.screen-marks.is-mobile .import-controls .switch-mode-btn {
+  flex: 1 1 100%;
+  white-space: nowrap;
+  text-align: center;
+  max-width: 100%;
+  padding: 10px 16px;
 }
 
 .import-file-btn,
