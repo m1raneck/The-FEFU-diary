@@ -3,7 +3,7 @@ WORKDIR /app
 ARG VITE_API_URL=
 ENV VITE_API_URL=$VITE_API_URL
 COPY package*.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci
+RUN --mount=type=cache,target=/root/.npm npm install
 COPY . .
 RUN npm run build
 

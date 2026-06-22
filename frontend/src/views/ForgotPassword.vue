@@ -1,5 +1,5 @@
 <template>
-  <div class="screen">
+  <div class="screen" :class="{ 'is-mobile': isMobile }">
     <div class="login-card">
       <div class="card-content">
         <div class="title-section">
@@ -43,47 +43,57 @@ export default {
     return {
       email: '',
       error: '',
-      loading: false
+      loading: false,
+      isMobile: false
     }
   },
+  mounted() {
+    this.checkIfMobile();
+    window.addEventListener('resize', this.checkIfMobile);
+  },
+  beforeDestroy() {
+    window.removeEventListener('resize', this.checkIfMobile);
+  },
   methods: {
+    checkIfMobile() {
+      this.isMobile = window.innerWidth < 768;
+    },
     validateEmail(email) {
-      const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      return re.test(email)
+      const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return re.test(email);
     },
     async handleReset() {
       if (!this.email) {
-        this.error = 'Пожалуйста, введите почту'
-        return
+        this.error = 'Пожалуйста, введите почту';
+        return;
       }
       if (!this.validateEmail(this.email)) {
-        this.error = 'Введите корректный email'
-        return
+        this.error = 'Введите корректный email';
+        return;
       }
 
-      this.loading = true
-      this.error = ''
+      this.loading = true;
+      this.error = '';
       try {
-        await requestPasswordReset(this.email)
-        alert(`Ссылка для восстановления пароля отправлена на ${this.email}`)
+        await requestPasswordReset(this.email);
+        alert(`Ссылка для восстановления пароля отправлена на ${this.email}`);
         setTimeout(() => {
-          this.$router.push('/')
-        }, 2000)
+          this.$router.push('/');
+        }, 2000);
       } catch (err) {
-        this.error = err.message || 'Ошибка отправки. Попробуйте позже.'
+        this.error = err.message || 'Ошибка отправки. Попробуйте позже.';
       } finally {
-        this.loading = false
+        this.loading = false;
       }
     },
     goBack() {
-      this.$router.push('/')
+      this.$router.push('/');
     }
   }
 }
 </script>
 
 <style scoped>
-/* Все стили сохранены без изменений */
 * {
   margin: 0;
   padding: 0;
@@ -103,6 +113,26 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 2rem;
+}
+
+.screen.is-mobile {
+  background-image: url('@/assets/main2.PNG');
+  background-color: #49709ac2;
+  background-blend-mode: overlay;
+  background-position: left center;
+  position: relative;
+}
+.screen.is-mobile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.1) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+.screen.is-mobile > * {
+  position: relative;
+  z-index: 1;
 }
 
 .login-card {

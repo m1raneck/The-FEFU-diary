@@ -74,7 +74,7 @@ class ScheduleResponse(ScheduleBase):
 class GradeCategoryBase(BaseModel):
     code: str = Field(..., max_length=20, examples=["DZ", "KR"])
     name: str = Field(..., max_length=100, examples=["Домашняя работа"])
-    weight: float = Field(..., gt=0, examples=[1.0])
+    weight: float = Field(..., gt=0, examples=[0.3])
 
 
 class GradeCategorySetRequest(BaseModel):

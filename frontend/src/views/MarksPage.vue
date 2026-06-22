@@ -1,7 +1,7 @@
 <template>
-  <div class="screen-marks">
+  <div class="screen-marks" :class="{ 'is-mobile': isMobile }">
     <div class="marks-card">
-      <div class="card-header">
+      <div class="card-header" v-if="showHeader && !isMobile">
         <div class="header-left">
           <div class="logo-mini">UniDiary</div>
         </div>
@@ -11,48 +11,68 @@
           <button class="close-btn" @click="$emit('close')">✕</button>
         </div>
       </div>
+      <div class="card-header card-header-mobile" v-if="showHeader && isMobile">
+        <div class="header-top">
+          <div class="header-left">
+            <div class="logo-mini">UniDiary</div>
+          </div>
+          <button class="close-btn" @click="$emit('close')">✕</button>
+        </div>
+        <div class="header-bottom">
+          <div class="subject-badge">{{ subjectName }}</div>
+          <div class="group-badge">{{ groupName || 'Группа' }}</div>
+        </div>
+      </div>
 
       <div class="import-panel">
-        <div class="import-controls">
+        <div v-if="!isMobile" class="import-controls">
           <button class="sample-btn" @click="downloadSampleXlsx">Пример XLSX</button>
           <div class="export-dropdown" ref="exportDropdownRef">
-            <button type="button" class="sample-btn export-trigger" @click.stop="toggleExportMenu">
-              📥 Экспорт
-            </button>
+            <button type="button" class="sample-btn export-trigger" @click.stop="toggleExportMenu">📥 Экспорт</button>
             <div v-if="exportMenuOpen" class="export-menu" @click.stop>
               <button type="button" class="export-menu-item" @click="pickExportFormat('csv')">CSV (.csv)</button>
-              <button type="button" class="export-menu-item" @click="pickExportFormat('xlsx')">Excel (.xlsx)</button>
               <button type="button" class="export-menu-item" @click="pickExportFormat('excel')">Excel (.xls)</button>
             </div>
           </div>
           <label class="import-file-btn">
-            Загрузить XLSX
-            <input type="file" accept=".csv,.xlsx,.xls" @change="handleFileUpload" style="display: none" ref="fileInput" />
-          </label>
+  Загрузить XLSX
+  <input type="file" accept=".csv,.xlsx,.xls" @change="handleFileUpload" style="display: none" ref="fileInput" />
+</label>
           <button class="scale-settings-btn" @click.stop="openScalePopup($event)">⚙ Шкала и веса</button>
-          <button v-if="!importModeActive" class="switch-mode-btn" @click="activateImportMode">➕ Импорт нескольких
-            тестов</button>
+          <button v-if="!importModeActive" class="switch-mode-btn" @click="activateImportMode">➕ Импорт нескольких тестов</button>
           <button v-else class="switch-mode-btn" @click="cancelMultiImport">✕ Отменить импорт</button>
+        </div>
+
+        <div v-if="isMobile" class="import-controls import-controls-mobile">
+          <div class="mobile-import-row">
+            <button class="import-btn scale-settings-btn" @click.stop="openScalePopup($event)">⚙ Шкала и веса</button>
+            <div class="export-dropdown" ref="exportDropdownRef">
+              <button type="button" class="import-btn export-trigger" @click.stop="toggleExportMenu">📥 Экспорт</button>
+              <div v-if="exportMenuOpen" class="export-menu" @click.stop>
+                <button type="button" class="export-menu-item" @click="pickExportFormat('csv')">CSV (.csv)</button>
+                <button type="button" class="export-menu-item" @click="pickExportFormat('excel')">Excel (.xls)</button>
+              </div>
+            </div>
+          </div>
+          <div class="mobile-import-row">
+            <label class="import-file-btn">
+  Загрузить XLSX
+  <input type="file" accept=".csv,.xlsx,.xls" @change="handleFileUpload" style="display: none" ref="fileInput" />
+</label>
+            <button v-if="!importModeActive" class="import-btn switch-mode-btn" @click="activateImportMode">➕ Импорт нескольких тестов</button>
+            <button v-else class="import-btn switch-mode-btn" @click="cancelMultiImport">✕ Отменить импорт</button>
+          </div>
+        </div>
+
+        <div class="filter-row">
           <div class="attendance-filter">
             <span class="filter-label">Мин. посещений:</span>
-            <input
-              type="number"
-              class="filter-input"
-              v-model.number="minAttendanceFilter"
-              min="0"
-              :max="dates.length"
-              placeholder="0"
-            />
-            <button v-if="minAttendanceFilter > 0" type="button" class="filter-reset" @click="resetMinAttendanceFilter">×</button>
+            <input type="number" class="filter-input" v-model.number="minAttendanceFilter" min="0" :max="dates.length" placeholder="0" />
+            <button v-if="minAttendanceFilter > 0" type="button" class="filter-reset" @click="minAttendanceFilter = 0">×</button>
           </div>
           <div class="student-search">
             <span class="filter-label">Поиск:</span>
-            <input
-              type="search"
-              class="search-input"
-              v-model="studentSearchQuery"
-              placeholder="ФИО студента"
-            />
+            <input type="search" class="search-input" v-model="studentSearchQuery" placeholder="ФИО студента" />
             <button v-if="studentSearchQuery" type="button" class="filter-reset" @click="studentSearchQuery = ''">×</button>
           </div>
         </div>
@@ -73,8 +93,7 @@
             </div>
           </div>
           <div class="import-actions">
-            <button @click="applyMultiImport" :disabled="!hasEnabledMappings" class="apply-import-btn">📥 Выставить
-              оценки</button>
+            <button @click="applyMultiImport" :disabled="!hasEnabledMappings" class="apply-import-btn">📥 Выставить оценки</button>
             <button @click="cancelMultiImport" class="cancel-import-btn">Отмена</button>
           </div>
           <div v-if="multiPreview.length" class="import-preview">
@@ -82,12 +101,12 @@
             <div class="preview-list">
               <div v-for="preview in multiPreview.slice(0, 5)" :key="preview.studentName" class="preview-item">
                 <span class="preview-name">{{ preview.studentName }}</span>
-                <span v-for="map in preview.mappings" :key="map.csvHeader" class="preview-mapping">{{ map.csvHeader }} →
-                  {{ map.finalGrade }}</span>
+                <span v-for="map in preview.mappings" :key="map.csvHeader" class="preview-mapping">{{ map.csvHeader }} → {{ map.finalGrade }}</span>
               </div>
             </div>
           </div>
         </div>
+
         <div v-if="importMessage" class="import-message" :class="importMessageType">{{ importMessage }}</div>
       </div>
 
@@ -97,12 +116,11 @@
             <tr>
               <th class="col-num">№</th>
               <th class="col-name">ФИО</th>
-              <th class="col-stat">Ср. <span class="avg-hint">(2–5)</span></th>
+              <th class="col-stat">Итоговая оценка</th>
               <th class="col-stat">П.</th>
               <th v-for="(date, dIdx) in dates" :key="date" class="date-col">
                 <div class="date-text">{{ date }}</div>
-                <div class="type-selector" @click.stop="openTypePopup($event, dIdx)">{{
-                  getTypeLabel(columnSettings[dIdx].type) }}</div>
+                <div class="type-selector" @click.stop="openTypePopup($event, dIdx)">{{ getTypeLabel(columnSettings[dIdx].type) }}</div>
               </th>
             </tr>
           </thead>
@@ -110,12 +128,11 @@
             <tr v-if="visibleStudentEntries.length === 0" class="empty-row">
               <td :colspan="4 + dates.length" class="empty-cell">Студенты не найдены</td>
             </tr>
-            <tr v-for="({ student, sIdx }, idx) in visibleStudentEntries" :key="student.id" class="student-row" :class="{ 'row-warn-att': isAttendanceWarning(student) }">
+            <tr v-for="({ student, sIdx }, idx) in visibleStudentEntries" :key="student.id" class="student-row">
               <td class="col-num">{{ idx + 1 }}</td>
-              <td class="col-name" :class="{ 'warn-att': isAttendanceWarning(student) }">{{ student.name }}</td>
-              <td class="col-stat"><span class="avg-badge" :class="getAvgClass(student.avg)">{{ student.avg }}</span>
-              </td>
-              <td class="col-stat" :class="{ 'warn-att': isAttendanceWarning(student) }">{{ student.attendance }}%</td>
+              <td class="col-name">{{ student.name }}</td>
+              <td class="col-stat"><span class="avg-badge" :class="getAvgClass(student.avg)">{{ student.avg }}</span></td>
+              <td class="col-stat" :class="{ 'warn-att': student.attendance < 60 }">{{ student.attendance }}%</td>
               <td v-for="(rec, dIdx) in student.records" :key="dIdx" class="combo-cell">
                 <div class="combo-inner">
                   <div class="combo-grade" @click.stop="editGrade(sIdx, dIdx)">
@@ -156,8 +173,7 @@
       <div class="legend-row">
         <span class="legend-item"><span class="leg-dot pres-dot"></span>Присутствовал</span>
         <span class="legend-item"><span class="leg-dot abs-dot"></span>Отсутствовал</span>
-        <span class="legend-sep">|</span>
-        <span class="legend-item">Оценка · посещение · 💬 комментарий</span>
+        <span class="legend-item">| Оценка · посещение · 💬 Комментарий</span>
       </div>
     </div>
 
@@ -181,47 +197,20 @@
           <div class="popup-label scale-title">Настройка шкалы</div>
           <div class="scale-inputs">
             <div class="scale-row"><span class="grade-label">Оценка 2:</span>
-              <div class="custom-number"><button class="num-btn dec"
-                  @click="gradeScale.from2 = Math.max(0, gradeScale.from2 - 1)">−</button><input type="number"
-                  v-model.number="gradeScale.from2" step="1" class="scale-input"><button class="num-btn inc"
-                  @click="gradeScale.from2 = Math.min(gradeScale.to2 - 1, gradeScale.from2 + 1)">+</button></div>
-              <div class="custom-number"><button class="num-btn dec"
-                  @click="gradeScale.to2 = Math.max(gradeScale.from2 + 1, gradeScale.to2 - 1)">−</button><input
-                  type="number" v-model.number="gradeScale.to2" step="1" class="scale-input"><button class="num-btn inc"
-                  @click="gradeScale.to2 = Math.min(gradeScale.from3 - 1, gradeScale.to2 + 1)">+</button></div>
+              <div class="custom-number"><button class="num-btn dec" @click="gradeScale.from2 = Math.max(0, gradeScale.from2 - 1)">−</button><input type="number" v-model.number="gradeScale.from2" step="1" class="scale-input"><button class="num-btn inc" @click="gradeScale.from2 = Math.min(gradeScale.to2 - 1, gradeScale.from2 + 1)">+</button></div>
+              <div class="custom-number"><button class="num-btn dec" @click="gradeScale.to2 = Math.max(gradeScale.from2 + 1, gradeScale.to2 - 1)">−</button><input type="number" v-model.number="gradeScale.to2" step="1" class="scale-input"><button class="num-btn inc" @click="gradeScale.to2 = Math.min(gradeScale.from3 - 1, gradeScale.to2 + 1)">+</button></div>
             </div>
             <div class="scale-row"><span class="grade-label">Оценка 3:</span>
-              <div class="custom-number"><button class="num-btn dec"
-                  @click="gradeScale.from3 = Math.max(gradeScale.to2 + 1, gradeScale.from3 - 1)">−</button><input
-                  type="number" v-model.number="gradeScale.from3" step="1" class="scale-input"><button
-                  class="num-btn inc"
-                  @click="gradeScale.from3 = Math.min(gradeScale.to3 - 1, gradeScale.from3 + 1)">+</button></div>
-              <div class="custom-number"><button class="num-btn dec"
-                  @click="gradeScale.to3 = Math.max(gradeScale.from3 + 1, gradeScale.to3 - 1)">−</button><input
-                  type="number" v-model.number="gradeScale.to3" step="1" class="scale-input"><button class="num-btn inc"
-                  @click="gradeScale.to3 = Math.min(gradeScale.from4 - 1, gradeScale.to3 + 1)">+</button></div>
+              <div class="custom-number"><button class="num-btn dec" @click="gradeScale.from3 = Math.max(gradeScale.to2 + 1, gradeScale.from3 - 1)">−</button><input type="number" v-model.number="gradeScale.from3" step="1" class="scale-input"><button class="num-btn inc" @click="gradeScale.from3 = Math.min(gradeScale.to3 - 1, gradeScale.from3 + 1)">+</button></div>
+              <div class="custom-number"><button class="num-btn dec" @click="gradeScale.to3 = Math.max(gradeScale.from3 + 1, gradeScale.to3 - 1)">−</button><input type="number" v-model.number="gradeScale.to3" step="1" class="scale-input"><button class="num-btn inc" @click="gradeScale.to3 = Math.min(gradeScale.from4 - 1, gradeScale.to3 + 1)">+</button></div>
             </div>
             <div class="scale-row"><span class="grade-label">Оценка 4:</span>
-              <div class="custom-number"><button class="num-btn dec"
-                  @click="gradeScale.from4 = Math.max(gradeScale.to3 + 1, gradeScale.from4 - 1)">−</button><input
-                  type="number" v-model.number="gradeScale.from4" step="1" class="scale-input"><button
-                  class="num-btn inc"
-                  @click="gradeScale.from4 = Math.min(gradeScale.to4 - 1, gradeScale.from4 + 1)">+</button></div>
-              <div class="custom-number"><button class="num-btn dec"
-                  @click="gradeScale.to4 = Math.max(gradeScale.from4 + 1, gradeScale.to4 - 1)">−</button><input
-                  type="number" v-model.number="gradeScale.to4" step="1" class="scale-input"><button class="num-btn inc"
-                  @click="gradeScale.to4 = Math.min(gradeScale.from5 - 1, gradeScale.to4 + 1)">+</button></div>
+              <div class="custom-number"><button class="num-btn dec" @click="gradeScale.from4 = Math.max(gradeScale.to3 + 1, gradeScale.from4 - 1)">−</button><input type="number" v-model.number="gradeScale.from4" step="1" class="scale-input"><button class="num-btn inc" @click="gradeScale.from4 = Math.min(gradeScale.to4 - 1, gradeScale.from4 + 1)">+</button></div>
+              <div class="custom-number"><button class="num-btn dec" @click="gradeScale.to4 = Math.max(gradeScale.from4 + 1, gradeScale.to4 - 1)">−</button><input type="number" v-model.number="gradeScale.to4" step="1" class="scale-input"><button class="num-btn inc" @click="gradeScale.to4 = Math.min(gradeScale.from5 - 1, gradeScale.to4 + 1)">+</button></div>
             </div>
             <div class="scale-row"><span class="grade-label">Оценка 5:</span>
-              <div class="custom-number"><button class="num-btn dec"
-                  @click="gradeScale.from5 = Math.max(gradeScale.to4 + 1, gradeScale.from5 - 1)">−</button><input
-                  type="number" v-model.number="gradeScale.from5" step="1" class="scale-input"><button
-                  class="num-btn inc"
-                  @click="gradeScale.from5 = Math.min(gradeScale.to5 - 1, gradeScale.from5 + 1)">+</button></div>
-              <div class="custom-number"><button class="num-btn dec"
-                  @click="gradeScale.to5 = Math.max(gradeScale.from5 + 1, gradeScale.to5 - 1)">−</button><input
-                  type="number" v-model.number="gradeScale.to5" step="1" class="scale-input"><button class="num-btn inc"
-                  @click="gradeScale.to5 = Math.min(100, gradeScale.to5 + 1)">+</button></div>
+              <div class="custom-number"><button class="num-btn dec" @click="gradeScale.from5 = Math.max(gradeScale.to4 + 1, gradeScale.from5 - 1)">−</button><input type="number" v-model.number="gradeScale.from5" step="1" class="scale-input"><button class="num-btn inc" @click="gradeScale.from5 = Math.min(gradeScale.to5 - 1, gradeScale.from5 + 1)">+</button></div>
+              <div class="custom-number"><button class="num-btn dec" @click="gradeScale.to5 = Math.max(gradeScale.from5 + 1, gradeScale.to5 - 1)">−</button><input type="number" v-model.number="gradeScale.to5" step="1" class="scale-input"><button class="num-btn inc" @click="gradeScale.to5 = Math.min(100, gradeScale.to5 + 1)">+</button></div>
             </div>
             <div class="scale-section-title">Весовые коэффициенты</div>
             <div v-for="cat in categoryWeights" :key="cat.code" class="scale-row">
@@ -237,7 +226,6 @@
       </Transition>
     </Teleport>
 
-    <!-- Модалка для ввода оценки -->
     <Teleport to="body">
       <Transition name="fade-scale">
         <div v-if="gradeInput.visible" class="grade-overlay" @click.self="gradeInput.visible = false">
@@ -246,9 +234,7 @@
             <div class="grade-popup-sub">{{ gradeInput.typeName }}</div>
             <input ref="gradeInputRef" v-model="gradeInput.value" class="grade-field" type="number" min="0"
               placeholder="Баллы" @keyup.enter="confirmGrade" @keyup.esc="gradeInput.visible = false">
-            <div class="grade-actions"><button class="btn-cancel"
-                @click="gradeInput.visible = false">Отмена</button><button class="btn-ok"
-                @click="confirmGrade">Сохранить</button></div>
+            <div class="grade-actions"><button class="btn-cancel" @click="gradeInput.visible = false">Отмена</button><button class="btn-ok" @click="confirmGrade">Сохранить</button></div>
           </div>
         </div>
       </Transition>
@@ -278,16 +264,23 @@
     </Teleport>
   </div>
 </template>
+
 <script setup>
 import { ref, nextTick, onMounted, onBeforeUnmount, computed, watch } from 'vue'
+import {
+  getStudents, getGrades, getAttendance, getLessonComments,
+  saveGrade, saveAttendance, saveLessonComment, bulkSaveGrades,
+  getGradeScale, saveGradeScale, getGradeCategories, saveGradeCategories,
+  getGradeColumns, saveGradeColumns, normalizeDate
+} from '@/services/marks'
 import * as XLSX from 'xlsx'
-import { getStudents, getGrades, getAttendance, getLessonComments, saveGrade, saveAttendance, saveLessonComment, bulkSaveGrades, getGradeScale, saveGradeScale, getGradeCategories, saveGradeCategories, getGradeColumns, saveGradeColumns, normalizeDate } from '@/services/marks'
 
 const props = defineProps({ 
   subjectName: { type: String, default: 'Базы данных' },
   groupId: { type: Number, default: 1 },
   groupName: { type: String, default: '' },
-  scheduleId: { type: Number, default: null }
+  scheduleId: { type: Number, default: null },
+  showHeader: { type: Boolean, default: true }
 })
 const emit = defineEmits(['close'])
 
@@ -297,51 +290,7 @@ const students = ref([])
 const studentsMap = ref(new Map())
 const minAttendanceFilter = ref(0)
 const studentSearchQuery = ref('')
-const MIN_ATTENDANCE_STORAGE_KEY = 'journalMinAttendanceFilters'
-
-function loadMinAttendanceFilter() {
-  if (!props.scheduleId) {
-    minAttendanceFilter.value = 0
-    return
-  }
-  try {
-    const stored = JSON.parse(localStorage.getItem(MIN_ATTENDANCE_STORAGE_KEY) || '{}')
-    const value = Number(stored[props.scheduleId] ?? 0)
-    minAttendanceFilter.value = Number.isFinite(value) && value > 0 ? value : 0
-  } catch {
-    minAttendanceFilter.value = 0
-  }
-}
-
-function saveMinAttendanceFilter(value) {
-  if (!props.scheduleId) return
-  try {
-    const stored = JSON.parse(localStorage.getItem(MIN_ATTENDANCE_STORAGE_KEY) || '{}')
-    const normalized = Math.max(0, Math.min(dates.length, Number(value) || 0))
-    if (normalized > 0) stored[props.scheduleId] = normalized
-    else delete stored[props.scheduleId]
-    localStorage.setItem(MIN_ATTENDANCE_STORAGE_KEY, JSON.stringify(stored))
-    if (normalized !== Number(value)) minAttendanceFilter.value = normalized
-  } catch {
-    // ignore storage errors
-  }
-}
-
-function resetMinAttendanceFilter() {
-  minAttendanceFilter.value = 0
-  saveMinAttendanceFilter(0)
-}
-
-function isAttendanceWarning(student) {
-  if (minAttendanceFilter.value > 0) {
-    return (student.attendanceCount ?? 0) < minAttendanceFilter.value
-  }
-  return student.attendance < 60
-}
-
-function sortStudentsAlphabetically() {
-  students.value.sort((a, b) => a.name.localeCompare(b.name, 'ru'))
-}
+const isMobile = ref(false)
 
 const visibleStudentEntries = computed(() => {
   const q = studentSearchQuery.value.trim().toLowerCase()
@@ -351,7 +300,6 @@ const visibleStudentEntries = computed(() => {
       if (q && !student.name.toLowerCase().includes(q)) return false
       return true
     })
-    .sort((a, b) => a.student.name.localeCompare(b.student.name, 'ru'))
 })
 
 const gradeScale = ref({
@@ -362,47 +310,10 @@ const gradeScale = ref({
 })
 
 const categoryWeights = ref([
-  { code: 'DZ', name: 'ДЗ', weight: 1 },
-  { code: 'KR', name: 'КР', weight: 1 },
-  { code: 'DOP', name: 'ДОП', weight: 1 },
+  { code: 'DZ', name: 'ДЗ', weight: 0.3 },
+  { code: 'KR', name: 'КР', weight: 0.5 },
+  { code: 'DOP', name: 'ДОП', weight: 0.2 },
 ])
-
-const DEFAULT_CATEGORY_TEMPLATE = [
-  { code: 'DZ', name: 'ДЗ', weight: 1 },
-  { code: 'KR', name: 'КР', weight: 1 },
-  { code: 'DOP', name: 'ДОП', weight: 1 },
-]
-
-const LEGACY_CATEGORY_WEIGHTS = { DZ: 0.3, KR: 0.5, DOP: 0.2 }
-const LEGACY_WEIGHT_VALUES = new Set([0.2, 0.3, 0.5])
-
-function isLegacyCategoryWeight(code, weight) {
-  const w = Number(weight)
-  const legacy = LEGACY_CATEGORY_WEIGHTS[code]
-  if (legacy != null && Math.abs(w - legacy) < 0.001) return true
-  return LEGACY_WEIGHT_VALUES.has(w)
-}
-
-function categoriesNeedDefaultWeights(categories) {
-  if (!categories?.length) return true
-  if (categories.every(c => !c.id)) return true
-  return categories.every(c => isLegacyCategoryWeight(c.code, c.weight))
-}
-
-function applyCategoryTemplate(categories) {
-  const byCode = Object.fromEntries((categories || []).map(c => [c.code, c]))
-  const useDefaults = categoriesNeedDefaultWeights(categories)
-  return DEFAULT_CATEGORY_TEMPLATE.map(t => {
-    const fromApi = byCode[t.code]
-    if (!fromApi) return { ...t }
-    return {
-      id: fromApi.id,
-      code: t.code,
-      name: fromApi.name || t.name,
-      weight: useDefaults ? 1 : Number(fromApi.weight),
-    }
-  })
-}
 
 function categoriesToPayload() {
   return categoryWeights.value.map(c => ({
@@ -449,15 +360,16 @@ async function loadScaleAndCategories() {
       getGradeCategories(props.scheduleId),
     ])
     if (rules?.length) gradeScale.value = rulesToLocalScale(rules)
-
-    const useDefaults = categoriesNeedDefaultWeights(categories)
-    categoryWeights.value = applyCategoryTemplate(categories)
-
-    if (useDefaults) {
-      await saveGradeCategories(props.scheduleId, categoriesToPayload())
+    if (categories?.length) {
+      categoryWeights.value = categories.map(c => ({
+        id: c.id,
+        code: c.code,
+        name: c.name,
+        weight: Number(c.weight),
+      }))
     }
   } catch (err) {
-    console.warn('Шкала/веса не загружены, используются значения по умолчанию', err)
+    console.warn('Шкала/веса не загружены', err)
   }
 }
 
@@ -542,7 +454,6 @@ function isoToDateIdx(isoDate) {
   return dates.indexOf(formatted)
 }
 
-// ========== Загрузка студентов из API ==========
 async function loadStudents() {
   const token = localStorage.getItem('token')
   if (!token) return
@@ -560,7 +471,8 @@ async function loadStudents() {
       attendancePoints: 0,
       records: dates.map(() => ({ grade: '', present: true, comment: '' }))
     }))
-    sortStudentsAlphabetically()
+    
+    students.value.sort((a, b) => a.name.localeCompare(b.name, 'ru'))
     
     filtered.forEach(s => {
       studentsMap.value.set(s.full_name, s.id)
@@ -574,7 +486,6 @@ async function loadStudents() {
     console.error('Ошибка загрузки студентов', err)
   }
 }
-
 async function loadColumnSettings() {
   if (!props.scheduleId) return
   try {
@@ -673,7 +584,6 @@ async function loadMarksFromDb() {
   }
 }
 
-// ========== CSV импорт ==========
 const importModeActive = ref(false)
 const csvScoreColumns = ref([])
 const rawCsvRows = ref([])
@@ -689,9 +599,6 @@ const hasEnabledMappings = computed(() => csvScoreColumns.value.some(c => c.targ
 
 function activateImportMode() {
   importModeActive.value = true
-  if (csvScoreColumns.value.length === 0) {
-    setImportMsg('Загрузите XLSX-файл с журналом или CSV с процентами', 'info')
-  }
 }
 
 function cancelMultiImport() {
@@ -700,7 +607,7 @@ function cancelMultiImport() {
   rawCsvRows.value = []
   headers.value = []
   multiPreview.value = []
-  setImportMsg('', 'info')
+  importMessage.value = ''
 }
 
 function parseCSV(text) {
@@ -717,189 +624,38 @@ function parseCSV(text) {
   return rows
 }
 
-function readFileToRows(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    const isExcel = /\.xlsx?$/i.test(file.name)
-    reader.onload = (e) => {
-      try {
-        if (isExcel) {
-          const workbook = XLSX.read(e.target.result, { type: 'array' })
-          const sheet = workbook.Sheets[workbook.SheetNames[0]]
-          resolve(XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false }))
-        } else {
-          resolve(parseCSV(e.target.result))
-        }
-      } catch (err) {
-        reject(err)
-      }
-    }
-    reader.onerror = () => reject(new Error('Не удалось прочитать файл'))
-    if (isExcel) reader.readAsArrayBuffer(file)
-    else reader.readAsText(file, 'UTF-8')
-  })
-}
-
-function isJournalImportFormat(headerRow) {
-  const headers = headerRow.map(h => String(h).trim())
-  const hasFio = headers.some(h => /фио|студент|student|name/i.test(h))
-  const hasJournalMarkers = headers.some(h => /посещ/i.test(h)) ||
-    headers.some(h => /\d{1,2}\/\d{1,2}\s*\(/i.test(h))
-  return hasFio && hasJournalMarkers
-}
-
-function mapJournalColumns(headerRow) {
-  const headers = headerRow.map(h => String(h).trim())
-  let nameColIdx = headers.findIndex(h => /^(фио|студент|student|name)$/i.test(h))
-  if (nameColIdx === -1) nameColIdx = headers.findIndex(h => /фио|студент|student|name/i.test(h))
-  if (nameColIdx === -1 && headers.some(h => /^№$/i.test(h))) nameColIdx = 1
-
-  const dateColumns = {}
-  dates.forEach((date, dIdx) => {
-    headers.forEach((header, colIdx) => {
-      if (!header.includes(date)) return
-      if (!dateColumns[dIdx]) dateColumns[dIdx] = {}
-      if (/посещ/i.test(header)) dateColumns[dIdx].presence = colIdx
-      else if (/комм/i.test(header)) dateColumns[dIdx].comment = colIdx
-      else dateColumns[dIdx].grade = colIdx
-    })
-  })
-  return { nameColIdx, dateColumns }
-}
-
-function parseGradeFromImport(value) {
-  const s = String(value ?? '').trim()
-  if (!s || s === '—' || s === '-') return ''
-  if (s === '+' || s === '-') return s
-  const match = s.match(/^([\d.]+)/)
-  return match ? match[1] : s
-}
-
-function parsePresenceValue(value) {
-  const s = String(value ?? '').trim().toLowerCase()
-  if (!s || s === '—') return null
-  if (['✓', '✔', 'v', '+', 'да', 'yes', 'present', '1', 'p', 'п'].includes(s)) return true
-  if (['✗', '✘', 'x', 'нет', 'no', 'absent', '0', 'н', '-'].includes(s)) return false
-  return null
-}
-
-async function persistImportedJournal(dateColumns) {
-  const scheduleId = props.scheduleId
-  if (!scheduleId) return
-
-  for (let dIdx = 0; dIdx < dates.length; dIdx++) {
-    const cols = dateColumns[dIdx]
-    if (!cols) continue
-    const gradeDate = dateToIso(dates[dIdx])
-
-    if (cols.grade !== undefined) {
-      const gradesToSend = []
-      for (const student of students.value) {
-        const rec = student.records[dIdx]
-        if (rec.grade === '+' || rec.grade === '-') {
-          gradesToSend.push({
-            student_id: student.id,
-            raw_score: rec.grade === '+' ? 1 : 0,
-            grade: rec.grade === '+' ? 1 : 0,
-            auto_convert: false,
-          })
-          continue
-        }
-        const rawScore = parseCellScore(rec.grade)
-        if (rawScore == null) continue
-        gradesToSend.push({
-          student_id: student.id,
-          raw_score: rawScore,
-          grade: convertScoreToGrade(rawScore),
-          auto_convert: true,
-        })
-      }
-      if (gradesToSend.length) {
-        await bulkSaveGrades({ scheduleId, gradeDate, grades: gradesToSend })
-      }
-    }
-
-    if (cols.presence !== undefined) {
-      for (const student of students.value) {
-        await saveAttendance({
-          studentId: student.id,
-          scheduleId,
-          status: student.records[dIdx].present ? 'present' : 'absent',
-          date: gradeDate,
-        })
-      }
-    }
-
-    if (cols.comment !== undefined) {
-      for (const student of students.value) {
-        await saveLessonComment({
-          studentId: student.id,
-          scheduleId,
-          lessonDate: gradeDate,
-          comment: student.records[dIdx].comment || '',
-        })
-      }
-    }
-  }
-}
-
-async function importJournalFromRows(rows) {
-  if (!props.scheduleId) throw new Error('Не выбрана пара (schedule_id)')
-
-  const { nameColIdx, dateColumns } = mapJournalColumns(rows[0])
-  if (nameColIdx === -1) throw new Error('Не найдена колонка ФИО')
-  if (!Object.keys(dateColumns).length) throw new Error('Не найдены колонки с датами')
-
-  let matched = 0
-  for (let r = 1; r < rows.length; r++) {
-    const row = rows[r]
-    const name = String(row[nameColIdx] ?? '').trim()
-    if (!name) continue
-
-    const student = students.value.find(s => s.name.toLowerCase() === name.toLowerCase())
-    if (!student) continue
-    matched++
-
-    for (const [dIdxStr, cols] of Object.entries(dateColumns)) {
-      const dIdx = Number(dIdxStr)
-      const rec = student.records[dIdx]
-      if (cols.grade !== undefined) rec.grade = parseGradeFromImport(row[cols.grade])
-      if (cols.presence !== undefined) {
-        const present = parsePresenceValue(row[cols.presence])
-        if (present !== null) rec.present = present
-      }
-      if (cols.comment !== undefined) {
-        rec.comment = String(row[cols.comment] ?? '').trim()
-      }
-    }
-  }
-
-  if (matched === 0) throw new Error('Не найдено совпадений студентов по ФИО')
-
-  recalcStudentStats()
-  await persistImportedJournal(dateColumns)
-  await loadMarksFromDb()
-  recalcStudentStats()
-  sortStudentsAlphabetically()
-  setImportMsg(`✅ Импортировано ${matched} студентов из журнала`, 'success')
-}
-
 function handleFileUpload(event) {
   const file = event.target.files[0]
   if (!file) return
-  readFileToRows(file)
-    .then(async (rows) => {
-      if (rows.length < 2) throw new Error('Файл должен содержать заголовки и данные')
-      if (isJournalImportFormat(rows[0])) {
-        await importJournalFromRows(rows)
+  const reader = new FileReader()
+  const isExcel = /\.xlsx?$/i.test(file.name)
+
+  reader.onload = (e) => {
+    try {
+      let rows
+      if (isExcel) {
+        // Читаем Excel-файл
+        const workbook = XLSX.read(e.target.result, { type: 'array' })
+        const sheet = workbook.Sheets[workbook.SheetNames[0]]
+        rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false })
       } else {
-        analyzeCSVForMultiImport(rows)
+        // Читаем CSV-файл
+        rows = parseCSV(e.target.result)
       }
-    })
-    .catch((err) => setImportMsg(err.message, 'error'))
+      if (rows.length < 2) throw new Error('Файл должен содержать заголовки и данные')
+      analyzeCSVForMultiImport(rows)
+    } catch (err) {
+      setImportMsg(err.message, 'error')
+    }
+  }
+
+  if (isExcel) {
+    reader.readAsArrayBuffer(file)
+  } else {
+    reader.readAsText(file, 'UTF-8')
+  }
   event.target.value = ''
 }
-
 function analyzeCSVForMultiImport(rows) {
   headers.value = rows[0].map(h => h.trim())
   const dataRows = rows.slice(1)
@@ -980,6 +736,10 @@ async function applyMultiImport() {
     setImportMsg('Не выбрана пара (schedule_id)', 'error')
     return
   }
+
+  console.log('Импорт начат, scheduleId:', scheduleId)
+  console.log('Студенты в БД:', students.value.map(s => s.name))
+
   let totalSaved = 0
 
   for (const col of csvScoreColumns.value) {
@@ -990,24 +750,29 @@ async function applyMultiImport() {
 
     for (let rowIdx = 0; rowIdx < rawCsvRows.value.length; rowIdx++) {
       const studentNameRaw = col.rawNames[rowIdx]
-      const student = students.value.find(s => s.name.toLowerCase() === studentNameRaw?.toLowerCase())
-      if (!student) continue
+      if (!studentNameRaw) continue
 
-      const studentId = studentsMap.value.get(student.name)
-      if (!studentId) {
-        console.warn(`Студент ${student.name} не найден в БД`)
+      const student = students.value.find(s =>
+        s.name.toLowerCase().trim() === studentNameRaw.toLowerCase().trim()
+      )
+      if (!student) {
+        console.warn(`Студент "${studentNameRaw}" не найден`)
         continue
       }
 
       let percent = col.studentScores[rowIdx]
       let finalGrade = col.useGradeScale ? convertScoreToGrade(percent) : Math.min(percent, 100)
-      if (col.useGradeScale && finalGrade === null) finalGrade = percent
+
+      if (finalGrade === null || finalGrade === undefined) {
+        console.warn(`Не удалось перевести ${percent}% для ${student.name}`)
+        continue
+      }
 
       gradesToSend.push({
-        student_id: studentId,
+        student_id: student.id,
         raw_score: percent,
-        auto_convert: col.useGradeScale,
-        grade: col.useGradeScale ? convertScoreToGrade(percent) : Math.min(percent, 100),
+        auto_convert: false,   // ← вот это изменение
+        grade: finalGrade,
       })
     }
 
@@ -1045,15 +810,6 @@ function setImportMsg(msg, type) {
 
 watch(csvScoreColumns, () => { computeMultiPreview() }, { deep: true })
 
-watch(minAttendanceFilter, (value) => {
-  saveMinAttendanceFilter(value)
-})
-
-watch(() => props.scheduleId, () => {
-  loadMinAttendanceFilter()
-})
-
-// ========== Остальные методы (типы колонок, оценки, посещаемость) ==========
 const scalePopup = ref({ visible: false })
 function openScalePopup(event) {
   event?.stopPropagation?.()
@@ -1278,32 +1034,18 @@ function toggleExportMenu() {
 function pickExportFormat(format) {
   exportMenuOpen.value = false
   if (format === 'csv') exportJournalCsv()
-  else if (format === 'xlsx') exportJournalXlsx()
   else exportJournalExcel()
 }
 
-function buildSampleJournalRows() {
-  const header = ['№', 'ФИО', 'Ср.', 'П.%']
-  dates.forEach((date, dIdx) => {
-    const type = getTypeLabel(columnSettings.value[dIdx].type)
-    header.push(`${date} (${type})`)
-    header.push(`${date} посещ.`)
-    header.push(`${date} комм.`)
-  })
-  const emptyDates = dates.map(() => ['—', '✓', ''])
-  const sampleData = [
-    { name: 'Ковалёв Леонид', avg: '4', att: '80%', cells: [['85', '✓', ''], ['64', '✓', ''], ...emptyDates.slice(2)] },
-    { name: 'Морозов Максим', avg: '—', att: '40%', cells: [['10', '✗', 'болел'], ['—', '✗', ''], ...emptyDates.slice(2)] },
-    { name: 'Шварц Анжелика', avg: '3', att: '60%', cells: [['42', '✓', ''], ['33', '✗', ''], ...emptyDates.slice(2)] },
-  ]
-  return [
-    header,
-    ...sampleData.map((s, i) => [i + 1, s.name, s.avg, s.att, ...s.cells.flat()]),
-  ]
-}
-
 function downloadSampleXlsx() {
-  downloadXlsxFile('example_journal.xlsx', buildSampleJournalRows())
+  const sampleRows = [
+    ['Студент', 'Тест 1 (%)', 'Тест 2 (%)'],
+    ['Ковалёв Леонид', '85', '64'],
+    ['Шварц Анжелика', '42', '33'],
+    ['Углицкий Евгений', '78', '91'],
+    ['Смирнов Григорий', '94', '73']
+  ]
+  downloadXlsxFile('example_marks.xlsx', sampleRows)
 }
 
 function downloadXlsxFile(filename, rows) {
@@ -1343,8 +1085,7 @@ function buildJournalExportRows() {
     header.push(`${date} комм.`)
   })
 
-  const sorted = [...students.value].sort((a, b) => a.name.localeCompare(b.name, 'ru'))
-  const rows = sorted.map((student, index) => {
+  const rows = students.value.map((student, index) => {
     const row = [
       index + 1,
       student.name,
@@ -1464,25 +1205,36 @@ function exportJournalExcel() {
   setImportMsg('✅ Журнал экспортирован в Excel', 'success')
 }
 
-function exportJournalXlsx() {
-  if (!students.value.length) {
-    setImportMsg('Нет данных для экспорта', 'error')
-    return
-  }
-  const name = sanitizeFileName(`${props.groupName}_${props.subjectName}`)
-  downloadXlsxFile(`journal_${name}.xlsx`, buildJournalExportRows())
-  setImportMsg('✅ Журнал экспортирован в XLSX', 'success')
+function preventBodyScroll(e) {
+  if (e.target.closest('.marks-card')) return
+  e.preventDefault()
 }
 
-// ========== Жизненный цикл ==========
 onMounted(() => {
-  loadMinAttendanceFilter()
+  document.body.addEventListener('touchmove', preventBodyScroll, { passive: false })
+  document.body.classList.add('no-scroll')
   loadScaleAndCategories()
   loadStudents()
+  checkIfMobile()
+  window.addEventListener('resize', checkIfMobile)
   document.addEventListener('click', handleClickOutside)
 })
 
-onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
+onBeforeUnmount(() => {
+  document.body.removeEventListener('touchmove', preventBodyScroll)
+  document.body.classList.remove('no-scroll')
+  window.removeEventListener('resize', checkIfMobile)
+  document.removeEventListener('click', handleClickOutside)
+})
+
+function checkIfMobile() {
+  isMobile.value = window.innerWidth < 768
+  if (isMobile.value) {
+    document.body.classList.add('is-mobile')
+  } else {
+    document.body.classList.remove('is-mobile')
+  }
+}
 </script>
 
 <style scoped>
@@ -1493,20 +1245,22 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
 }
 
 .screen-marks {
+  height: 100%;
   display: flex;
   padding: 0;
   background: #eef4fa;
   align-items: center;
   justify-content: center;
+  border-radius: 28px;
   font-family: 'Inter', system-ui, sans-serif;
 }
 
 .marks-card {
   width: 100%;
-  max-width: 1400px;
-  max-height: 90vh;
-  overflow-y: auto;
-  background: linear-gradient(145deg, rgba(208, 218, 229, 0.65) 22%, rgba(165, 186, 202, 0.45) 79%, rgba(130, 164, 192, 0.65) 100%);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(145deg, rgba(225, 239, 255, 0.65) 22%, rgba(165, 186, 202, 0.45) 79%, rgba(130, 164, 192, 0.65));
   backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.8);
   border-radius: 28px;
@@ -1570,7 +1324,7 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
 
 .import-panel {
   margin: 1.5rem 2rem 0;
-  background: rgba(235, 245, 255, 0.7);
+  background: rgba(179, 204, 228, 0.7);
   backdrop-filter: blur(4px);
   border-radius: 25px;
   border: 0.5px solid rgba(131, 179, 211, 0.6);
@@ -1583,6 +1337,18 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
+}
+.import-controls .switch-mode-btn {
+  flex: 0 1 auto;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.screen-marks.is-mobile .import-controls .switch-mode-btn {
+  flex: 1 1 100%;
+  white-space: nowrap;
+  text-align: center;
+  max-width: 100%;
+  padding: 10px 16px;
 }
 
 .import-file-btn,
@@ -1774,10 +1540,12 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
 
 .table-wrapper {
   overflow-x: auto;
-  margin: 1.5rem 2rem 1rem;
+  overflow-y: auto;
+  margin: 1rem 1.5rem 1rem;
   border-radius: 28px;
   background: rgba(80, 110, 140, 0.3);
   border: 1px solid rgba(103, 116, 193, 0.526);
+  flex: 1;
 }
 
 .marks-table {
@@ -1812,6 +1580,39 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
 
 .student-row:hover td {
   background: rgba(164, 175, 225, 0.554);
+}
+
+.popup-fade-enter-active,
+.popup-fade-leave-active {
+  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.popup-fade-enter-from {
+  opacity: 0;
+  transform: translateY(-12px) scale(0.92);
+}
+
+.popup-fade-leave-to {
+  opacity: 0;
+  transform: translateY(8px) scale(0.96);
+}
+
+.fade-scale-enter-active {
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.fade-scale-leave-active {
+  transition: all 0.2s ease-in;
+}
+
+.fade-scale-enter-from {
+  opacity: 0;
+  transform: scale(0.88) translateY(10px);
+}
+
+.fade-scale-leave-to {
+  opacity: 0;
+  transform: scale(0.94) translateY(8px);
 }
 
 .col-num {
@@ -1857,14 +1658,6 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
 .warn-att {
   color: #b13b3b;
   font-weight: 600;
-}
-
-.row-warn-att {
-  background: rgba(177, 59, 59, 0.04);
-}
-
-.row-warn-att .combo-inner {
-  border-color: rgba(177, 59, 59, 0.25);
 }
 
 .date-col {
@@ -2017,23 +1810,23 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
 }
 
 .popup-btn.kr {
-  background: #586C91;
-  color: #283347;
+  background: #8fa4c3;
+  color: #4b618b;
 }
 
 .popup-btn.dop {
-  background: #586C91;
+  background: #586c91;
   color: #283347;
 }
 
 .popup-btn.dz {
-  background: #BDCFE9;
-  color: #6B83A8;
+  background: #bdcfe9;
+  color: #6b83a8;
 }
 
 .popup-btn.dash {
-  background: #BDCFE9;
-  color: #6B83A8;
+  background: #5c7bb4;
+  color: #cde1ff;
 }
 
 .popup-btn:hover {
@@ -2255,27 +2048,160 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
   color: white;
 }
 
-.popup-fade-enter-active,
-.popup-fade-leave-active {
-  transition: all 0.15s ease;
+.comment-popup { min-width: 320px; }
+
+.legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0 16px;    
+  margin: 0 2rem;           
+  font-size: 12px;
+  color: #4a6080;
 }
 
-.popup-fade-enter-from {
-  opacity: 0;
-  transform: translateY(-6px);
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 30px;
 }
 
-.fade-scale-enter-active {
-  transition: all 0.2s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+.leg-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
 }
 
-.fade-scale-leave-active {
-  transition: all 0.1s;
+.pres-dot { background: #5fba8a; }
+.abs-dot { background: #e58e8e; }
+
+.comment-field {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #b8cfdf;
+  border-radius: 12px;
+  font-size: 14px;
+  resize: vertical;
+  font-family: inherit;
+  margin-bottom: 4px;
 }
 
-.fade-scale-enter-from {
-  opacity: 0;
-  transform: scale(0.96);
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+  align-items: center;
+  padding: 0 4px;
+  justify-content: center; 
+}
+
+.attendance-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 20px;
+  border: 1px solid rgba(100, 160, 200, 0.45);
+}
+
+.student-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 20px;
+  border: 1px solid rgba(100, 160, 200, 0.45);
+}
+
+.filter-label {
+  font-size: 12px;
+  color: #1f4a6e;
+  font-weight: 500;
+}
+
+.filter-input {
+  width: 48px;
+  padding: 4px 6px;
+  border: 1px solid #b8cfdf;
+  border-radius: 8px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.filter-reset {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: #dce8f5;
+  color: #1f4a6e;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.search-input {
+  width: 140px;
+  padding: 4px 8px;
+  border: 1px solid #b8cfdf;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.search-input::placeholder {
+  color: #8aa8c4;
+}
+
+.empty-cell {
+  text-align: center;
+  padding: 24px;
+  color: #5c6f8c;
+  font-size: 14px;
+}
+
+.grade-raw { font-weight: 700; }
+.grade-arrow { color: #6b8cae; margin: 0 2px; font-size: 11px; }
+.grade-pct { font-size: 11px; color: #2c6e9e; font-weight: 600; }
+
+.combo-comment {
+  width: 32px;              
+  height: 32px;
+  border-radius: 50%;          
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(150, 180, 210, 0.3);
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.combo-comment:hover {
+  background: #c1d5ec;
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.combo-comment.has-comment {
+  background: #c8daf0;
+  border-color: #bed8ee;
+  box-shadow: 0 0 0 2px rgba(95, 138, 173, 0.2);
+}
+
+.scale-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #3d6a8c;
+  margin: 12px 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .mapping-row select {
@@ -2363,157 +2289,238 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
   background-color: #e9f0f8;
 }
 
-.avg-hint {
-  font-size: 10px;
-  font-weight: 500;
-  color: #6b8cae;
-}
-
-.att-pts {
-  display: block;
-  font-size: 10px;
-  color: #6b8cae;
-  font-weight: 500;
-}
-
-.attendance-filter {
+.screen-marks.is-mobile {
+  background: url('@/assets/main2.PNG');
+  background-size: cover;
+  background-position: left center;
+  background-repeat: no-repeat;
+  background-color: #c2dff5;
+  background-blend-mode: lighten;
+  height: 100%;
   display: flex;
-  align-items: center;
+  padding: 5px;
+  background: #a3bfdb;
+  position: relative;
+  border-radius: 0;
+}
+.screen-marks.is-mobile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.1) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+.screen-marks.is-mobile > * { position: relative; z-index: 1; }
+
+.screen-marks.is-mobile .marks-card {
+   background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(12px);
+  border-radius: 32px;
+  margin: 0.5rem;
+  overflow-y: auto;
+  height: 100%;
+  overscroll-behavior: contain;
+  -webkit-overscroll-behavior: contain;
+  box-shadow: none;
+  border: none;  
+}
+.screen-marks.is-mobile .card-header-mobile {
+  display: flex;
+  flex-direction: column;
+  padding: 0.8rem 1rem;
   gap: 6px;
-  padding: 6px 12px;
-  background: rgba(255, 255, 255, 0.45);
-  border-radius: 20px;
-  border: 1px solid rgba(100, 160, 200, 0.45);
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.filter-label {
+.screen-marks.is-mobile .card-header-mobile .header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.screen-marks.is-mobile .card-header-mobile .header-bottom {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+.screen-marks.is-mobile .header-right {
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+.screen-marks.is-mobile .subject-badge,
+.screen-marks.is-mobile .group-badge {
+  padding: 4px 12px;
   font-size: 12px;
-  color: #1f4a6e;
+}
+.screen-marks.is-mobile .close-btn {
+  width: 30px;
+  height: 30px;
+  font-size: 18px;
+}
+.screen-marks.is-mobile .import-panel {
+  margin: 0.5rem 1rem;
+  padding: 0.8rem;
+}
+.screen-marks.is-mobile .import-controls {
+  gap: 6px;
+  justify-content: flex-start;
+}
+.screen-marks.is-mobile .sample-btn {
+  display: none;
+}
+
+.screen-marks.is-mobile .import-file-btn,
+.screen-marks.is-mobile .switch-mode-btn,
+.screen-marks.is-mobile .scale-settings-btn {
+  padding: 6px 12px;
+  font-size: 11px;
+}
+
+.screen-marks.is-mobile .table-wrapper {
+  overflow-x: auto;
+  overflow-y: visible;
+  margin: 0.5rem;
+  border-radius: 20px;
+  flex: 1 0 auto;
+}
+.screen-marks.is-mobile .marks-table {
+  min-width: 650px;
+  font-size: 11px;
+}
+.screen-marks.is-mobile .marks-table th,
+.screen-marks.is-mobile .marks-table td {
+  padding: 8px 4px;
+}
+.screen-marks.is-mobile .combo-inner {
+  height: 28px;
+}
+.screen-marks.is-mobile .grade-val {
+  font-size: 12px;
+}
+
+.screen-marks.is-mobile .combo-presence {
+  width: 24px;
+  height: 24px;
+}
+.screen-marks.is-mobile .combo-presence .presence-icon {
+  font-size: 12px;
+}
+.screen-marks.is-mobile .combo-comment {
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+}
+
+.screen-marks.is-mobile .import-controls-mobile .mobile-import-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.screen-marks.is-mobile .import-file-btn,
+.screen-marks.is-mobile .import-btn {
+  background: rgba(248, 252, 255, 0.9);
+  border: 0.5px solid rgba(112, 165, 218, 0.5);
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 10px;
   font-weight: 500;
-}
-
-.filter-input {
-  width: 48px;
-  padding: 4px 6px;
-  border: 1px solid #b8cfdf;
-  border-radius: 8px;
-  font-size: 13px;
-  text-align: center;
-}
-
-.filter-reset {
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: 50%;
-  background: #dce8f5;
   color: #1f4a6e;
   cursor: pointer;
-  font-size: 14px;
-  line-height: 1;
-}
-
-.student-search {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: rgba(255, 255, 255, 0.45);
-  border-radius: 20px;
-  border: 1px solid rgba(100, 160, 200, 0.45);
-}
-
-.search-input {
-  width: 140px;
-  padding: 4px 8px;
-  border: 1px solid #b8cfdf;
-  border-radius: 8px;
-  font-size: 13px;
-}
-
-.search-input::placeholder {
-  color: #8aa8c4;
-}
-
-.empty-cell {
+  transition: 0.2s;
+  white-space: nowrap;
+  flex: 1;
+  max-width: 190px;
   text-align: center;
-  padding: 24px;
-  color: #5c6f8c;
-  font-size: 14px;
 }
 
-.grade-raw { font-weight: 700; }
-.grade-arrow { color: #6b8cae; margin: 0 2px; font-size: 11px; }
-.grade-pct { font-size: 11px; color: #2c6e9e; font-weight: 600; }
+.screen-marks.is-mobile .import-controls {
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
 
-.combo-comment {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+.screen-marks.is-mobile .legend-row {
+  margin: 0 0.5rem 16px;
+  font-size: 10px;
+  gap: 8px;
+  justify-content: center;
+}
+</style>
+
+<style>
+.marks-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(5,15,35,0.55);
+  backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(150, 180, 210, 0.5);
-  transition: 0.15s;
+  z-index: 1000;
+  padding: 20px;
 }
-
-.combo-comment:hover { background: #d4e3f5; }
-.combo-comment.has-comment {
-  background: #c8daf0;
-  border-color: #5f8aad;
-}
-
-.scale-section-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: #3d6a8c;
-  margin: 12px 0 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.comment-field {
+.marks-modal-glass {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #b8cfdf;
-  border-radius: 12px;
-  font-size: 14px;
-  resize: vertical;
-  font-family: inherit;
-  margin-bottom: 4px;
+  max-width: 1100px;
+  height: 88vh;
+  background: rgba(12,28,65,0.55);
+  backdrop-filter: blur(40px);
+  border: 1px solid rgba(140,190,255,0.18);
+  border-radius: 28px;
+  overflow: hidden;
+}
+.marks-modal-enter-active, .marks-modal-leave-active { transition: all 0.3s ease; }
+.marks-modal-enter-from { opacity: 0; transform: scale(0.95); }
+.marks-modal-leave-to { opacity: 0; transform: scale(0.95); }
+
+.no-scroll {
+  overflow: hidden;
 }
 
-.comment-popup { min-width: 320px; }
-
-.legend-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 24px 16px;
-  font-size: 12px;
-  color: #4a6080;
+body.is-mobile .scale-popup {
+  width: 350px !important;
+  padding: 12px 16px !important;
+  border-radius: 24px !important;
 }
 
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+body.is-mobile .scale-popup .popup-label {
+  font-size: 15px !important;
+  margin-bottom: 12px !important;
 }
 
-.leg-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+body.is-mobile .scale-row {
+  padding: 4px 12px !important;
+  gap: 6px !important;
 }
 
-.pres-dot { background: #5fba8a; }
-.abs-dot { background: #e58e8e; }
+body.is-mobile .grade-label {
+  width: 60px !important;
+  font-size: 12px !important;
+}
 
-.legend-sep {
-  color: #8aa8c4;
+body.is-mobile .scale-input {
+  width: 50px !important;
+  padding: 4px 5px !important;
+  font-size: 12px !important;
+}
+
+body.is-mobile .num-btn {
+  width: 24px !important;
+  height: 24px !important;
+  font-size: 16px !important;
+}
+
+body.is-mobile .large-btn {
+  padding: 6px 16px !important;
+  font-size: 13px !important;
+}
+
+body.is-mobile .scale-section-title {
+  text-align: center !important;
 }
 </style>

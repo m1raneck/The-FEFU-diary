@@ -38,7 +38,7 @@ INSERT INTO subjects (name, short_name, description, credits) VALUES
 ON CONFLICT (name) DO NOTHING;
 
 INSERT INTO users (email, password_hash, full_name, phone)
-SELECT 'ivanov@university.ru', '$2b$12$gSvqqUPHQ.cIvV2dWK3UKOYm8sIErGhXGLVbF5DhDiNn.3NhF5jBi', 'Иванов Иван Иванович', '+7-900-222-3344'
+SELECT 'ivanov@university.ru', '$2y$12$EzjJ9cXFtQSfIfgovggeie6b9OSKEbDiFwKJ/tElKDVE1LNI2J2je', 'Иванов Иван Иванович', '+7-900-222-3344'
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'ivanov@university.ru');
 
 INSERT INTO user_roles (user_id, role_id)

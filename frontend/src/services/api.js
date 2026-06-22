@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL ?? ''
+const API_URL = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || 'http://localhost')
 
 export function getToken() {
   return localStorage.getItem('token')
@@ -21,13 +21,6 @@ function handleUnauthorized() {
   }
 }
 
-function formatApiError(err, status) {
-  const detail = Array.isArray(err.detail)
-    ? err.detail.map(d => d.msg || JSON.stringify(d)).join('; ')
-    : (err.detail || err.message)
-  return detail || `Ошибка запроса (${status})`
-}
-
 export async function apiRequest(path, options = {}) {
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
@@ -44,7 +37,7 @@ export async function apiRequest(path, options = {}) {
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}))
-    throw new Error(formatApiError(err, response.status))
+    throw new Error(err.detail || err.message || `Ошибка запроса (${response.status})`)
   }
 
   const contentType = response.headers.get('content-type') || ''
@@ -65,7 +58,6 @@ export async function apiPost(path, body) {
   })
 }
 
-/** POST without Authorization header — for login/register */
 export async function apiPublicPost(path, body) {
   const response = await fetch(`${API_URL}${path}`, {
     method: 'POST',
@@ -75,7 +67,7 @@ export async function apiPublicPost(path, body) {
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}))
-    throw new Error(formatApiError(err, response.status))
+    throw new Error(err.detail || err.message || `Ошибка запроса (${response.status})`)
   }
 
   return response.json()

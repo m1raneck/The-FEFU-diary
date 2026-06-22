@@ -1,10 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import LoginPage from '@/views/LoginPage.vue'
 import ForgotPassword from '@/views/ForgotPassword.vue'
-import SchedulePage from '@/views/SchedulePage.vue'
 import StudentGradesPage from '@/views/StudentGradesPage.vue'
-import TeacherGradesPage from '@/views/TeacherGradesPage.vue'
-import { getStoredUser, isStudent, isTeacher } from '@/services/auth'
+import { getStoredUser, isStudent } from '@/services/auth'
+import AllGradesPage from '@/views/AllGradesPage.vue'
 
 const routes = [
   {
@@ -31,8 +30,8 @@ const routes = [
   {
     path: '/all-grades',
     name: 'AllGrades',
-    component: TeacherGradesPage,
-    meta: { requiresAuth: true, teacherOnly: true }
+    component: AllGradesPage,
+    meta: { requiresAuth: true, role: 'teacher' },
   }
 ]
 
@@ -48,10 +47,6 @@ router.beforeEach((to, from, next) => {
   }
   if (to.meta.studentOnly && !isStudent(getStoredUser())) {
     next('/schedule')
-    return
-  }
-  if (to.meta.teacherOnly && !isTeacher(getStoredUser())) {
-    next(isStudent(getStoredUser()) ? '/my-grades' : '/schedule')
     return
   }
   next()

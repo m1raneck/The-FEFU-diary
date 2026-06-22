@@ -17,30 +17,6 @@ DEFAULT_SCALE_RULES = [
     schemas.GradeScaleRuleBase(min_points=81, max_points=100, final_grade=5),
 ]
 
-DEFAULT_CATEGORY_WEIGHT = 1.0
-
-DEFAULT_CATEGORIES = [
-    schemas.GradeCategoryBase(code="DZ", name="ДЗ", weight=DEFAULT_CATEGORY_WEIGHT),
-    schemas.GradeCategoryBase(code="KR", name="КР", weight=DEFAULT_CATEGORY_WEIGHT),
-    schemas.GradeCategoryBase(code="DOP", name="ДОП", weight=DEFAULT_CATEGORY_WEIGHT),
-]
-
-LEGACY_CATEGORY_WEIGHTS = {"DZ": 0.3, "KR": 0.5, "DOP": 0.2}
-LEGACY_WEIGHT_VALUES = {0.2, 0.3, 0.5}
-
-
-def is_legacy_category_weight(code: str, weight: float) -> bool:
-    legacy = LEGACY_CATEGORY_WEIGHTS.get(code)
-    if legacy is not None and abs(float(weight) - legacy) < 0.001:
-        return True
-    return float(weight) in LEGACY_WEIGHT_VALUES
-
-
-def categories_need_default_weights(rows) -> bool:
-    if not rows:
-        return True
-    return all(is_legacy_category_weight(r.code, float(r.weight)) for r in rows)
-
 
 def load_scale_rules(db: Session, schedule_id: int) -> list[ScaleRule]:
     rows = (
