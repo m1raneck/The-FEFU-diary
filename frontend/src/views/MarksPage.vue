@@ -26,7 +26,7 @@
 
       <div class="import-panel">
         <div v-if="!isMobile" class="import-controls">
-          <button class="sample-btn" @click="downloadSampleCSV">Пример CSV</button>
+          <button class="sample-btn" @click="downloadSampleXlsx">Пример XLSX</button>
           <div class="export-dropdown" ref="exportDropdownRef">
             <button type="button" class="sample-btn export-trigger" @click.stop="toggleExportMenu">📥 Экспорт</button>
             <div v-if="exportMenuOpen" class="export-menu" @click.stop>
@@ -35,9 +35,9 @@
             </div>
           </div>
           <label class="import-file-btn">
-            Загрузить CSV
-            <input type="file" accept=".csv" @change="handleFileUpload" style="display: none" ref="fileInput" />
-          </label>
+  Загрузить XLSX
+  <input type="file" accept=".csv,.xlsx,.xls" @change="handleFileUpload" style="display: none" ref="fileInput" />
+</label>
           <button class="scale-settings-btn" @click.stop="openScalePopup($event)">⚙ Шкала и веса</button>
           <button v-if="!importModeActive" class="switch-mode-btn" @click="activateImportMode">➕ Импорт нескольких тестов</button>
           <button v-else class="switch-mode-btn" @click="cancelMultiImport">✕ Отменить импорт</button>
@@ -56,9 +56,9 @@
           </div>
           <div class="mobile-import-row">
             <label class="import-file-btn">
-              Загрузить CSV
-              <input type="file" accept=".csv" @change="handleFileUpload" style="display: none" ref="fileInput" />
-            </label>
+  Загрузить XLSX
+  <input type="file" accept=".csv,.xlsx,.xls" @change="handleFileUpload" style="display: none" ref="fileInput" />
+</label>
             <button v-if="!importModeActive" class="import-btn switch-mode-btn" @click="activateImportMode">➕ Импорт нескольких тестов</button>
             <button v-else class="import-btn switch-mode-btn" @click="cancelMultiImport">✕ Отменить импорт</button>
           </div>
@@ -273,6 +273,7 @@ import {
   getGradeScale, saveGradeScale, getGradeCategories, saveGradeCategories,
   getGradeColumns, saveGradeColumns, normalizeDate
 } from '@/services/marks'
+import * as XLSX from 'xlsx'
 
 const props = defineProps({ 
   subjectName: { type: String, default: 'Базы данных' },
@@ -472,6 +473,8 @@ async function loadStudents() {
       records: dates.map(() => ({ grade: '', present: true, comment: '' }))
     }))
     
+    students.value.sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+    
     filtered.forEach(s => {
       studentsMap.value.set(s.full_name, s.id)
     })
@@ -484,7 +487,6 @@ async function loadStudents() {
     console.error('Ошибка загрузки студентов', err)
   }
 }
-
 async function loadColumnSettings() {
   if (!props.scheduleId) return
   try {
@@ -627,19 +629,34 @@ function handleFileUpload(event) {
   const file = event.target.files[0]
   if (!file) return
   const reader = new FileReader()
+  const isExcel = /\.xlsx?$/i.test(file.name)
+
   reader.onload = (e) => {
     try {
-      const rows = parseCSV(e.target.result)
+      let rows
+      if (isExcel) {
+        // Читаем Excel-файл
+        const workbook = XLSX.read(e.target.result, { type: 'array' })
+        const sheet = workbook.Sheets[workbook.SheetNames[0]]
+        rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false })
+      } else {
+        // Читаем CSV-файл
+        rows = parseCSV(e.target.result)
+      }
       if (rows.length < 2) throw new Error('Файл должен содержать заголовки и данные')
       analyzeCSVForMultiImport(rows)
     } catch (err) {
       setImportMsg(err.message, 'error')
     }
   }
-  reader.readAsText(file, 'UTF-8')
+
+  if (isExcel) {
+    reader.readAsArrayBuffer(file)
+  } else {
+    reader.readAsText(file, 'UTF-8')
+  }
   event.target.value = ''
 }
-
 function analyzeCSVForMultiImport(rows) {
   headers.value = rows[0].map(h => h.trim())
   const dataRows = rows.slice(1)
@@ -1012,7 +1029,7 @@ function pickExportFormat(format) {
   else exportJournalExcel()
 }
 
-function downloadSampleCSV() {
+function downloadSampleXlsx() {
   const sampleRows = [
     ['Студент', 'Тест 1 (%)', 'Тест 2 (%)'],
     ['Ковалёв Леонид', '85', '64'],
@@ -1020,7 +1037,14 @@ function downloadSampleCSV() {
     ['Углицкий Евгений', '78', '91'],
     ['Смирнов Григорий', '94', '73']
   ]
-  downloadStyledExcelFile('example_marks.xls', sampleRows)
+  downloadXlsxFile('example_marks.xlsx', sampleRows)
+}
+
+function downloadXlsxFile(filename, rows) {
+  const ws = XLSX.utils.aoa_to_sheet(rows)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Журнал')
+  XLSX.writeFile(wb, filename)
 }
 
 function sanitizeFileName(value) {
