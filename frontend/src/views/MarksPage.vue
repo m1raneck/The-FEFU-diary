@@ -750,26 +750,29 @@ async function applyMultiImport() {
 
     for (let rowIdx = 0; rowIdx < rawCsvRows.value.length; rowIdx++) {
       const studentNameRaw = col.rawNames[rowIdx]
-      if (!studentNameRaw) continue  // пропускаем пустые строки
+      if (!studentNameRaw) continue
 
-      // Ищем студента по имени (с trim и регистронезависимо)
-      const student = students.value.find(s => 
+      const student = students.value.find(s =>
         s.name.toLowerCase().trim() === studentNameRaw.toLowerCase().trim()
       )
       if (!student) {
-        console.warn(`Студент "${studentNameRaw}" не найден в БД`)
+        console.warn(`Студент "${studentNameRaw}" не найден`)
         continue
       }
 
       let percent = col.studentScores[rowIdx]
       let finalGrade = col.useGradeScale ? convertScoreToGrade(percent) : Math.min(percent, 100)
-      if (col.useGradeScale && finalGrade === null) finalGrade = percent
+
+      if (finalGrade === null || finalGrade === undefined) {
+        console.warn(`Не удалось перевести ${percent}% для ${student.name}`)
+        continue
+      }
 
       gradesToSend.push({
-        student_id: student.id,   // <-- исправлено
+        student_id: student.id,
         raw_score: percent,
-        auto_convert: col.useGradeScale,
-        grade: col.useGradeScale ? convertScoreToGrade(percent) : Math.min(percent, 100),
+        auto_convert: false,   // ← вот это изменение
+        grade: finalGrade,
       })
     }
 
