@@ -20,15 +20,19 @@
       <div class="filters">
         <div class="filter-group">
           <label>Группа:</label>
-          <select v-model="selectedGroupId" @change="onGroupChange">
-            <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
-          </select>
+          <div class="select-wrap">
+            <select v-model="selectedGroupId" @change="onGroupChange">
+              <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
+            </select>
+          </div>
         </div>
         <div class="filter-group">
           <label>Предмет:</label>
-          <select v-model="selectedSubjectId" @change="onSubjectChange">
-            <option v-for="s in subjects" :key="s.id" :value="s.id">{{ s.name }}</option>
-          </select>
+          <div class="select-wrap">
+            <select v-model="selectedSubjectId" @change="onSubjectChange">
+              <option v-for="s in subjects" :key="s.id" :value="s.id">{{ s.name }}</option>
+            </select>
+          </div>
         </div>
         <div class="filter-group info-group" v-if="selectedSubjectName && selectedGroupName">
           <span class="info-badge">{{ selectedSubjectName }}</span>
@@ -303,22 +307,6 @@ export default {
   font-size: 15px;
 }
 
-.filter-group select {
-  padding: 8px 16px;
-  border-radius: 30px;
-  border: 1px solid rgba(86, 112, 193, 0.5);
-  background: rgba(255,255,255,0.7);
-  font-weight: 500;
-  color: #1f3b4c;
-  outline: none;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.filter-group select:hover {
-  background: rgba(255,255,255,0.9);
-}
-
 .info-group {
   margin-left: auto;
   display: flex;
@@ -342,13 +330,33 @@ export default {
   padding: 0.5rem 1rem 1rem;
 }
 
-.filter-group select {
-  appearance: none;
-  -webkit-appearance: none;
+.select-wrap {
+  position: relative;
+  display: inline-block;
+  min-width: 160px;
+  max-width: 260px;
+}
+
+.select-wrap::after {
+  content: '';
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 8px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%234a6a8a' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 16px center;
-  background-size: 12px;
+  background-size: contain;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.filter-group select {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
   padding: 10px 44px 10px 20px;
   font-family: 'Inter', system-ui, sans-serif;
   background-color: rgba(255, 255, 255, 0.85);
@@ -359,24 +367,25 @@ export default {
   font-weight: 500;
   color: #1f3b4c;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
-  min-width: 160px;
-  max-width: 260px;
   text-overflow: ellipsis;
   white-space: nowrap;
   overflow: hidden;
+  outline: none;
+}
+
+.filter-group select::-ms-expand {
+  display: none;
 }
 
 .filter-group select:hover {
   background-color: rgba(255, 255, 255, 0.95);
   border-color: #6b8fc4;
   box-shadow: 0 4px 12px rgba(0, 20, 40, 0.12);
-  transform: translateY(-1px);
 }
 
 .filter-group select:focus {
-  outline: none;
   border-color: #4f7db3;
   box-shadow: 0 0 0 3px rgba(79, 125, 179, 0.25);
 }
@@ -474,10 +483,14 @@ export default {
   width: 100%;
 }
 
-.screen.is-mobile .filter-group select {
+.screen.is-mobile .select-wrap {
   width: 100%;
   min-width: auto;
   max-width: 100%;
+}
+
+.screen.is-mobile .filter-group select {
+  width: 100%;
 }
 
 .screen.is-mobile .info-group {

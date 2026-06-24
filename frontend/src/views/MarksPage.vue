@@ -457,6 +457,9 @@ function isoToDateIdx(isoDate) {
 async function loadStudents() {
   const token = localStorage.getItem('token')
   if (!token) return
+  students.value = []
+  studentsMap.value = new Map()
+  columnSettings.value = dates.map(() => ({type: null, categoryCode: null}))
   
   try {
     const data = await getStudents()
@@ -762,7 +765,6 @@ async function applyMultiImport() {
 
       let percent = col.studentScores[rowIdx]
       let finalGrade = col.useGradeScale ? convertScoreToGrade(percent) : Math.min(percent, 100)
-
       if (finalGrade === null || finalGrade === undefined) {
         console.warn(`Не удалось перевести ${percent}% для ${student.name}`)
         continue
@@ -771,7 +773,7 @@ async function applyMultiImport() {
       gradesToSend.push({
         student_id: student.id,
         raw_score: percent,
-        auto_convert: false,   // ← вот это изменение
+        auto_convert: false,
         grade: finalGrade,
       })
     }
@@ -809,7 +811,7 @@ function setImportMsg(msg, type) {
 }
 
 watch(csvScoreColumns, () => { computeMultiPreview() }, { deep: true })
-
+watch(() => [props.scheduleId, props.groupId], () => { if (props.scheduleId) { loadStudents() } }, { deep: false })
 const scalePopup = ref({ visible: false })
 function openScalePopup(event) {
   event?.stopPropagation?.()
