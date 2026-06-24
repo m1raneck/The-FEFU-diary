@@ -1,4 +1,16 @@
-const API_URL = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || 'http://localhost')
+function resolveApiUrl() {
+  if (import.meta.env.DEV) return ''
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL
+  if (typeof window !== 'undefined') {
+    // :8080 — frontend без gateway, API на порту 80
+    if (window.location.port === '8080') return 'http://localhost'
+    // xTunnel / gateway — запросы на тот же origin (/api проксируется)
+    return window.location.origin
+  }
+  return 'http://localhost'
+}
+
+const API_URL = resolveApiUrl()
 
 export function getToken() {
   return localStorage.getItem('token')

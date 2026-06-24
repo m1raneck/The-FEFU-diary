@@ -457,6 +457,9 @@ function isoToDateIdx(isoDate) {
 async function loadStudents() {
   const token = localStorage.getItem('token')
   if (!token) return
+  students.value = []
+  studentsMap.valuev = new Map()
+  columnSettings.value = dates.map(() => ({type: null, categoryCode: null}))
   
   try {
     const data = await getStudents()
@@ -809,7 +812,7 @@ function setImportMsg(msg, type) {
 }
 
 watch(csvScoreColumns, () => { computeMultiPreview() }, { deep: true })
-
+watch(() => [props.scheduleId, props.groupId], ()=>{if (props.scheduleId){loadStudents();}}, {deep: false});
 const scalePopup = ref({ visible: false })
 function openScalePopup(event) {
   event?.stopPropagation?.()
